@@ -83,6 +83,7 @@ $redis->on('start', function(Redis $redis) {
         global $ret;
         $ret[] = $value;
     });
+});
 
     $redis->rename('test','new_test')->then(function ($value) use ($redis) {
        if ($value == 'OK') {
