@@ -6,7 +6,6 @@ use Kraken\Throwable\Exception\LogicException;
 use RuntimeException;
 use Kraken\Loop\Loop;
 use UnderflowException;
-use Kraken\Promise\Promise;
 use Kraken\Promise\Deferred;
 use Kraken\Ipc\Socket\Socket;
 use Kraken\Redis\Command\Enum;
@@ -14,8 +13,6 @@ use Kraken\Redis\Protocol\Resp;
 use Kraken\Redis\Command\Builder;
 use Kraken\Event\EventEmitter;
 use Kraken\Loop\LoopInterface;
-use Kraken\Loop\Model\SelectLoop;
-use Kraken\Promise\PromiseInterface;
 use Clue\Redis\Protocol\Model\Request;
 use Kraken\Event\EventEmitterInterface;
 use Kraken\Redis\Command\CommandInterface;
@@ -102,7 +99,10 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         if ($this->ending) {
             $request->reject(new RuntimeException('Connection closed'));
         } else {
-            $this->stream->write($this->protocol->commands($command));
+            $payload = $this->protocol->commands($command);
+            $this->on('connect', function (Client $client) use ($payload) {
+                $client->stream->write($payload);
+            });
             $this->requests[] = $request;
         }
 
@@ -129,16 +129,8 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $this->emit('connect', [$this]);
     }
 
-    public function run(Closure $onConnect = null, Closure $onDisconnect = null)
+    public function run()
     {
-        if ($onConnect) {
-            $this->on('connect', $onConnect);
-        }
-
-        if ($onDisconnect) {
-            $this->on('disconnect', $onDisconnect);
-        }
-
         $this->connect();
         $this->loop->start();
     }
@@ -171,6 +163,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
                     $this->emit('close');
                 }
             }
+            $this->emit('close');
         });
     }
 
@@ -189,9 +182,6 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         } else {
             $request->resolve($message->getValueNative());
         }
-        if (!$this->isBusy()) {
-            $this->emit('close');
-        }
     }
 
     /**
@@ -199,10 +189,10 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
      */
     public function handleDisconnect()
     {
-        $this->removeListener('connect', [ $this, 'handleConnect' ]);
-        $this->removeListener('disconnect', [ $this, 'handleDisconnect' ]);
-        $this->removeListener('error', [ $this, 'handleError' ]);
-        $this->removeListener('close', [ $this, 'handleClose']);
+//        $this->removeListener('connect', [ $this, 'handleConnect' ]);
+//        $this->removeListener('disconnect', [ $this, 'handleDisconnect' ]);
+//        $this->removeListener('error', [ $this, 'handleError' ]);
+//        $this->removeListener('close', [ $this, 'handleClose']);
     }
 
     /**
