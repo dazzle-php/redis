@@ -4,9 +4,7 @@ namespace Kraken\Redis;
 
 use RuntimeException;
 use Kraken\Promise\Deferred;
-use Kraken\Ipc\Socket\Socket;
 use Kraken\Redis\Command\Enum;
-use Kraken\Redis\Protocol\Resp;
 use Kraken\Redis\Command\Builder;
 use Kraken\Loop\LoopInterface;
 use Clue\Redis\Protocol\Model\Request;
@@ -14,8 +12,6 @@ use Kraken\Redis\Command\CommandInterface;
 
 class Client implements CommandInterface
 {
-    private $ending;
-    private $closed;
     private $keys;
     private $cluster;
     private $connection;
@@ -32,16 +28,8 @@ class Client implements CommandInterface
     private $transactions;
 
     public $serverVersion;
-    /**
-     * @var Socket
-     */
-    private $stream;
-    /**
-     * @var Resp
-     */
+
     private $protocol;
-    
-    protected $requests;
 
     /**
      * @overwrite
@@ -51,7 +39,6 @@ class Client implements CommandInterface
     public function __construct($uri, LoopInterface $loop)
     {
         $this->uri = $uri;
-        $this->protocol = new Resp();
         $this->dispatcher = new Dispatcher($loop);
     }
 
@@ -59,10 +46,10 @@ class Client implements CommandInterface
     {
         $request = new Deferred();
         $promise = $request->getPromise();
-        if ($this->ending) {
+        if ($this->dispatcher->ending) {
             $request->reject(new RuntimeException('Connection closed'));
         } else {
-            $payload = $this->protocol->commands($command);
+            $payload = $this->dispatcher->protocol->commands($command);
             $this->dispatcher->on('request', function () use ($payload) {
                 $this->dispatcher->handleRequest($payload);
             });
@@ -72,9 +59,9 @@ class Client implements CommandInterface
         return $promise;
     }
 
-    public function run($config = [])
+    public function connect($config = [])
     {
-        $this->dispatcher->run($this->uri);
+        $this->dispatcher->watch($this->uri);
     }
 
     /**

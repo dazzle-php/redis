@@ -16,6 +16,7 @@ $client->flushDb();
 $client->set('test','Hello Kraken Redis!')->then(function ($value) {
     global $ret;
     $ret[] = $value;
+    echo $value.PHP_EOL;
 });
 
 $client->get('test')->then(function ($value) {
@@ -28,6 +29,16 @@ $client->info(['cpu'])->then(function ($value) {
     $ret[] = $value;
 });
 
-$client->run();
+$loop->onStart(function () use ($client, $loop) {
+    $client->dispatcher->on('error', function(\Exception $e) {
+        echo $e->getMessage().PHP_EOL;
+    });
+    $client->dispatcher->on('close', function () use ($loop){
+        $loop->stop();
+    });
+    $client->connect();
+});
+
+$loop->start();
 
 var_export($ret);
