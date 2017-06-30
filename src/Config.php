@@ -11,6 +11,7 @@ class Config
         if ($target === null) {
             $target = 'tcp://127.0.0.1';
         }
+
         if (strpos($target, '://') === false) {
             $target = 'tcp://' . $target;
         }
@@ -22,25 +23,29 @@ class Config
 
         if (!isset($parts['port'])) {
             $parts['port'] = 6379;
+            $this->port = 6379;
         }
 
         if ($parts['host'] === 'localhost') {
             $parts['host'] = '127.0.0.1';
+            $this->host = '127.0.0.1';
         }
 
         $auth = null;
         if (isset($parts['user'])) {
             $auth = $parts['user'];
+            $this->auth = $auth;
         }
+
         if (isset($parts['pass'])) {
             $auth .= ':' . $parts['pass'];
         }
+
         if ($auth !== null) {
             $parts['auth'] = $auth;
         }
 
         if (isset($parts['path']) && $parts['path'] !== '') {
-            // skip first slash
             $parts['db'] = substr($parts['path'], 1);
         }
 

@@ -2,26 +2,17 @@
 
 namespace Kraken\Redis;
 
-use Kraken\Throwable\Exception\LogicException;
 use RuntimeException;
-use Kraken\Loop\Loop;
-use UnderflowException;
 use Kraken\Promise\Deferred;
 use Kraken\Ipc\Socket\Socket;
 use Kraken\Redis\Command\Enum;
 use Kraken\Redis\Protocol\Resp;
 use Kraken\Redis\Command\Builder;
-use Kraken\Event\EventEmitter;
 use Kraken\Loop\LoopInterface;
 use Clue\Redis\Protocol\Model\Request;
-use Kraken\Event\EventEmitterInterface;
 use Kraken\Redis\Command\CommandInterface;
-use Clue\Redis\Protocol\Model\ErrorReply;
-use Clue\Redis\Protocol\Model\ModelInterface;
-use Clue\Redis\Protocol\Parser\ParserException;
-use Closure;
 
-class Client extends EventEmitter implements EventEmitterInterface,CommandInterface
+class Client implements CommandInterface
 {
     private $ending;
     private $closed;
@@ -49,10 +40,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
      * @var Resp
      */
     private $protocol;
-    /**
-     * @var Loop $loop
-     */
-    private $loop;
+    
     protected $requests;
 
     /**
@@ -62,37 +50,12 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
      */
     public function __construct($uri, LoopInterface $loop)
     {
-        parent::__construct($loop);
         $this->uri = $uri;
-        $this->loop = $loop;
-        $this->stream = null;
         $this->protocol = new Resp();
-        $this->requests = [];
-        $this->ending = false;
-        $this->closed = false;
-        $this->on('response',[$this, 'handleResponse']);
-        $this->on('close', [$this, 'handleClose']);
-        $this->on('disconnect',[$this, 'handleDisconnect']);
+        $this->dispatcher = new Dispatcher($loop);
     }
 
-    private function connection($uri)
-    {
-        try {
-            $stream = new Socket($uri, $this->loop);
-
-            return $stream;
-        } catch (LogicException $e) {
-            $this->end();
-            $this->loop->stop();
-        } catch (\Exception $e) {
-            $this->end();
-            $this->loop->stop();
-        }
-
-        return null;
-    }
-
-    private function dispatch(Request $command)
+    private function pipe(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
@@ -100,127 +63,18 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
             $request->reject(new RuntimeException('Connection closed'));
         } else {
             $payload = $this->protocol->commands($command);
-            $this->on('connect', function (Client $client) use ($payload) {
-                $client->stream->write($payload);
+            $this->dispatcher->on('request', function () use ($payload) {
+                $this->dispatcher->handleRequest($payload);
             });
-            $this->requests[] = $request;
+            $this->dispatcher->appendRequest($request);
         }
 
         return $promise;
     }
 
-    protected function isBusy()
+    public function run($config = [])
     {
-        return empty($this->requests) ? false : true;
-    }
-
-    public function connect()
-    {
-        if ($this->stream !== null) {
-            return;
-        }
-
-        $this->stream = $this->connection($this->uri);
-        if ($this->stream->isOpen()) {
-            $this->on('connect',[$this , 'handleConnect']);
-        }
-
-        //todo ; patch missing pub/sub,pipeline,auth
-        $this->emit('connect', [$this]);
-    }
-
-    public function run()
-    {
-        $this->connect();
-        $this->loop->start();
-    }
-
-    /**
-     * @internal
-     */
-    public function handleConnect()
-    {
-        $protocol = $this->protocol;
-        $that = $this;
-
-        $this->stream->on('data', function($_, $chunk) use ($protocol, $that) {
-            try {
-                $models = $protocol->parseResponse($chunk);
-            } catch (ParserException $error) {
-                $this->ending = true;
-                $that->emit('error', [$error]);
-                $that->emit('close');
-
-                return;
-            }
-
-            foreach ($models as $data) {
-                try {
-                    $this->emit('response', [$data]);
-                } catch (UnderflowException $error) {
-                    $this->ending = true;
-                    $that->emit('error', [$error]);
-                    $this->emit('close');
-                }
-            }
-            $this->emit('close');
-        });
-    }
-
-    /**
-     * @internal
-     */
-    public function handleResponse(ModelInterface $message)
-    {
-        if (!$this->requests) {
-            throw new UnderflowException('Unexpected reply received, no matching request found');
-        }
-        /* @var Deferred $request */
-        $request = array_shift($this->requests);
-        if ($message instanceof ErrorReply) {
-            $request->reject($message);
-        } else {
-            $request->resolve($message->getValueNative());
-        }
-    }
-
-    /**
-     * @internal
-     */
-    public function handleDisconnect()
-    {
-//        $this->removeListener('connect', [ $this, 'handleConnect' ]);
-//        $this->removeListener('disconnect', [ $this, 'handleDisconnect' ]);
-//        $this->removeListener('error', [ $this, 'handleError' ]);
-//        $this->removeListener('close', [ $this, 'handleClose']);
-    }
-
-    /**
-     * @internal
-     */
-    public function handleClose()
-    {
-        if ($this->closed) {
-            return;
-        }
-        $this->ending = true;
-        $this->closed = true;
-        $this->stream->close();
-        $this->emit('disconnect');
-        // reject all remaining requests in the queue
-        while($this->requests) {
-            $request = array_shift($this->requests);
-            /* @var $request Deferred */
-            $request->reject(new RuntimeException('Connection closing'));
-        }
-        $this->loop->stop();
-    }
-
-    public function end()
-    {
-        if (!$this->ending) {
-            $this->ending = true;
-        }
+        $this->dispatcher->run($this->uri);
     }
 
     /**
@@ -231,7 +85,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::AUTH;
         $args = [$password];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function append($key, $value)
@@ -239,21 +93,21 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::APPEND;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bgRewriteAoF()
     {
         $command = Enum::BGREWRITEAOF;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function bgSave()
     {
         $command = Enum::BGSAVE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function bitCount($key, $start = 0, $end = 0)
@@ -261,7 +115,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::BITCOUNT;
         $args = [$key, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitField($key, $subCommand = null, ...$param)
@@ -295,7 +149,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         }
         $args = array_filter($args);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitOp($operation, $dstKey, $srcKey, ...$keys)
@@ -304,7 +158,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$operation, $dstKey, $srcKey];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitPos($key, $bit, $start = 0, $end = 0)
@@ -312,7 +166,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::BITPOS;
         $args = [$key, $bit, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function blPop(array $keys, $timeout)
@@ -321,7 +175,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::BLPOP;
         $keys[] = $timeout;
         $args = $keys;
-        $promise = $this->dispatch(Builder::build($command, $args));
+        $promise = $this->pipe(Builder::build($command, $args));
         $promise = $promise->then(function ($value) {
             if (is_array($value)) {
                 list($k,$v) = $value;
@@ -344,7 +198,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::BRPOP;
         $keys[] = $timeout;
         $args = $keys;
-        $promise = $this->dispatch(Builder::build($command, $args));
+        $promise = $this->pipe(Builder::build($command, $args));
         $promise = $promise->then(function ($value) {
             if (is_array($value)) {
                 list($k,$v) = $value;
@@ -367,7 +221,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::BRPOPLPUSH;
         $args = [$src, $dst, $timeout];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function decr($key)
@@ -376,7 +230,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::DECR;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function decrBy($key, $decrement)
@@ -385,7 +239,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::DECRBY;
         $args = [$key, $decrement];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function del($key,...$keys)
@@ -394,7 +248,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $keys[] = $key;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function discard()
@@ -402,7 +256,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement discard() method.
         $command = Enum::DISCARD;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function dump($key)
@@ -411,7 +265,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::DUMP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function exists($key, ...$keys)
@@ -421,7 +275,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function expire($key, $seconds)
@@ -430,7 +284,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::EXPIRE;
         $args = [$key, $seconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function expireAt($key, $timestamp)
@@ -439,7 +293,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::EXPIREAT;
         $args = [$key, $timestamp];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function get($key)
@@ -447,7 +301,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GET;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getBit($key, $offset)
@@ -456,7 +310,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GETBIT;
         $args = [$key, $offset];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getRange($key, $start, $end)
@@ -465,7 +319,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GETRANGE;
         $args = [$key, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getSet($key, $value)
@@ -474,7 +328,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GETSET;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incr($key)
@@ -482,7 +336,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::INCR;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incrBy($key, $increment)
@@ -491,7 +345,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::INCRBY;
         $args = [$key, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incrByFloat($key, $increment)
@@ -500,7 +354,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::INCRBYFLOAT;
         $args = [$key, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function multi()
@@ -508,7 +362,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement multi() method.
         $command = Enum::MULTI;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function persist($key)
@@ -516,7 +370,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PERSIST;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pExpire($key, $milliseconds)
@@ -525,7 +379,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PEXPIRE;
         $args = [$key, $milliseconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pExpireAt($key, $milliseconds)
@@ -534,7 +388,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PEXPIREAT;
         $args = [$key, $milliseconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sync()
@@ -542,7 +396,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement sync() method.
         $command = Enum::SYNC;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function time()
@@ -550,7 +404,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement time() method.
         $command = Enum::TIME;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function touch($key, ...$keys)
@@ -559,7 +413,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function ttl($key)
@@ -568,7 +422,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::TTL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function type($key)
@@ -576,7 +430,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::TYPE;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unLink($key, ...$keys)
@@ -585,7 +439,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unWatch()
@@ -593,7 +447,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement unWatch() method.
         $command = Enum::UNWATCH;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function wait($numSlaves, $timeout)
@@ -602,7 +456,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::WAIT;
         $args = [$numSlaves, $timeout];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function watch($key, ...$keys)
@@ -612,7 +466,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function select($index)
@@ -629,7 +483,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         array_unshift($options, $key, $value);
         $args = $options;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setBit($key, $offset, $value)
@@ -638,7 +492,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SETBIT;
         $args = [$key, $offset, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setEx($key, $seconds, $value)
@@ -646,7 +500,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SETEX;
         $args = [$key, $seconds, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setNx($key, $value)
@@ -654,7 +508,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SETNX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function randomKey()
@@ -662,7 +516,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement randomKey() method.
         $command = Enum::RANDOMKEY;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function readOnly()
@@ -670,7 +524,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement readOnly() method.
         $command = Enum::READONLY;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function rename($key, $newKey)
@@ -678,7 +532,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RENAME;
         $args = [$key, $newKey];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function renameNx($key, $newKey)
@@ -686,7 +540,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RENAMENX;
         $args = [$key, $newKey];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function restore($key, $ttl, $value)
@@ -695,7 +549,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RESTORE;
         $args = [$key, $ttl, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function ping($message = 'PING')
@@ -703,14 +557,14 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PING;
         $args = [$message];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function quit()
     {
         $command = Enum::QUIT;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function setRange($key, $offset, $value)
@@ -718,7 +572,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SETRANGE;
         $args = [$key, $offset, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pTtl($key)
@@ -726,7 +580,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PTTL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pSetEx($key, $milliseconds, $value)
@@ -734,7 +588,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PSETEX;
         $args = [$key, $milliseconds, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hDel($key, ...$fields)
@@ -743,7 +597,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $fields);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hGet($key, $field)
@@ -751,7 +605,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HGET;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hGetAll($key)
@@ -759,7 +613,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HGETALL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args))->then(function ($value) {
+        return $this->pipe(Builder::build($command, $args))->then(function ($value) {
             if (!empty($value)) {
                 $tmp = [];
                 $size = count($value);
@@ -780,7 +634,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HINCRBY;
         $args = [$key, $field, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hIncrByFloat($key, $field, $increment)
@@ -788,7 +642,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HINCRBYFLOAT;
         $args = [$key, $field, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hKeys($key)
@@ -796,7 +650,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HKEYS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hLen($key)
@@ -804,7 +658,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hMGet($key, ...$fields)
@@ -813,7 +667,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $fields);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hMSet($key, array $fvMap)
@@ -829,7 +683,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         }
         $args = array_merge($args, $fvMap);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hSet($key, $field, $value)
@@ -837,7 +691,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HSET;
         $args = [$key, $field, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hSetNx($key, $filed, $value)
@@ -845,7 +699,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HSETNX;
         $args = [$key, $filed, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hStrLen($key, $field)
@@ -853,7 +707,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HSTRLEN;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hVals($key)
@@ -861,7 +715,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HVALS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoAdd($key, array $coordinates)
@@ -871,7 +725,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $coordinates);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoHash($key, ...$members)
@@ -887,7 +741,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoDist($key, $memberA, $memberB, $unit)
@@ -896,7 +750,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GEODIST;
         $args = [$key, $memberA, $memberB ,$unit];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoRadius($key, $longitude, $latitude, $unit, $command, $count, $sort)
@@ -905,7 +759,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GEORADIUS;
         $args = [$key, $longitude, $latitude, $unit, $command, $count, $sort];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoRadiusByMember($key, $member, $unit, $command, $count, $sort, $store, $storeDist)
@@ -914,7 +768,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::GEORADIUSBYMEMBER;
         $args = [$key, $member, $unit, $command, $count, $sort, $store, $storeDist];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pSubscribe(...$patterns)
@@ -923,7 +777,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PSUBSCRIBE;
         $args = $patterns;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pubSub($command, array $args = [])
@@ -931,7 +785,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement pubSub() method.
         $command = Enum::PUBSUB;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function publish($channel, $message)
@@ -940,7 +794,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PUBLISH;
         $args = [$channel, $message];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pUnsubscribe(...$patterns)
@@ -949,7 +803,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PUNSUBSCRIBE;
         $args = $patterns;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unSubscribe(...$channels)
@@ -958,7 +812,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::UNSUBSCRIBE;
         $args = $channels;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lIndex($key, $index)
@@ -967,7 +821,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LINDEX;
         $args = [$key, $index];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lInsert($key, $action, $pivot, $value)
@@ -976,7 +830,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LINSERT;
         $args = [$key, $action, $pivot, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lLen($key)
@@ -985,7 +839,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lPop($key)
@@ -994,7 +848,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LPOP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lPush($key,...$values)
@@ -1002,7 +856,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LPUSH;
         array_unshift($values, $key);
 
-        return $this->dispatch(Builder::build($command, $values));
+        return $this->pipe(Builder::build($command, $values));
     }
 
     public function lPushX($key, $value)
@@ -1010,7 +864,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LPUSHX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lRange($key, $start = 0, $stop = -1)
@@ -1018,7 +872,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LRANGE;
         $args = [$key, $start, $stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lRem($key, $count, $value)
@@ -1027,7 +881,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LREM;
         $args = [$key, $count, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lSet($key, $index, $value)
@@ -1036,7 +890,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LSET;
         $args = [$key, $index, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lTrim($key, $start, $stop)
@@ -1045,7 +899,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::LTRIM;
         $args = [$key, $start, $stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mGet($key, ...$values)
@@ -1055,7 +909,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $values);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mSet(array $kvMap)
@@ -1064,7 +918,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::MSET;
         $args = $kvMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function monitor()
@@ -1072,7 +926,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement monitor() method.
         $command = Enum::MONITOR;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function move($key, $db)
@@ -1081,7 +935,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::MOVE;
         $args = [$key, $db];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mSetNx($kvMap)
@@ -1090,7 +944,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::MSETNX;
         $args = $kvMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPop($key)
@@ -1098,7 +952,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RPOP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPopLPush($src, $dst)
@@ -1107,7 +961,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RPOPLPUSH;
         $args = [$src, $dst];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPush($key, ...$values)
@@ -1116,7 +970,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $values);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPushX($key, $value)
@@ -1124,7 +978,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::RPUSHX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFAdd($key, ...$elements)
@@ -1134,7 +988,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $elements);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFCount(...$keys)
@@ -1143,7 +997,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PFCOUNT;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFMerge(array $dsKeyMap)
@@ -1152,7 +1006,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::PFMERGE;
         $args = $dsKeyMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterAddSlots(...$slots)
@@ -1161,7 +1015,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_ADDSLOTS;
         $args = $slots;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterCountFailureReports($nodeId)
@@ -1170,7 +1024,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_COUNT_FAILURE_REPORTS;
         $args = [$nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterCountKeysInSlot($slot)
@@ -1179,7 +1033,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_COUNTKEYSINSLOT;
         $args = $slot;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterDelSlots(...$slots)
@@ -1188,7 +1042,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_DELSLOTS;
         $args = $slots;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterFailOver($operation)
@@ -1211,7 +1065,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement clusterInfo() method.
         $command = Enum::CLUSTER_INFO;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function clusterKeySlot($key)
@@ -1220,7 +1074,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_KEYSLOT;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterMeet($ip, $port)
@@ -1229,7 +1083,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_MEET;
         $args = [$ip, $port];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterNodes()
@@ -1269,7 +1123,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_SETSLOT;
         $args = [$command, $nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1281,7 +1135,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::CLUSTER_SLAVES;
         $args = [$nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1292,14 +1146,14 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement clusterSlots() method.
         $command = Enum::CLUSTER_SLOTS;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function flushAll()
     {
         $command = Enum::FLUSHALL;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function flushDb()
@@ -1307,14 +1161,14 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement flushDb() method.
         $command = Enum::FLUSHDB;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function info($section = [])
     {
         $command = Enum::INFO;
 
-        return $this->dispatch(Builder::build($command, $section))->then(function ($value) {
+        return $this->pipe(Builder::build($command, $section))->then(function ($value) {
             if ($value) {
                 $ret = explode(PHP_EOL, $value);
                 $handled = [];
@@ -1346,7 +1200,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zCard($key)
@@ -1355,7 +1209,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZCARD;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zCount($key, $min, $max)
@@ -1364,7 +1218,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZCOUNT;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zIncrBy($key, $increment, $member)
@@ -1373,7 +1227,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZINCRBY;
         $args = [$key, $increment, $member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zInterStore($dst, $numKeys)
@@ -1382,7 +1236,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZINTERSTORE;
         $args = [$dst, $numKeys];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zLexCount($key, $min, $max)
@@ -1391,7 +1245,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZLEXCOUNT;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRange($key, $star, $stop, array $options = [])
@@ -1401,7 +1255,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $star,$stop];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRangeByLex($key, $min, $max, array $options = [])
@@ -1411,7 +1265,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $min, $max];
         $args = array_merge($args,$options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRangeByLex($key, $max, $min, array $options = [])
@@ -1421,7 +1275,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $max,$min];
         $args = array_merge($args,$options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRangeByScore($key, $min, $max, array $options = [])
@@ -1431,7 +1285,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $min,$max];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRank($key, $member)
@@ -1440,7 +1294,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZRANK;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRem($key, ...$members)
@@ -1450,7 +1304,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRemRangeByLex($key, $min, $max)
@@ -1459,7 +1313,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZREMRANGEBYLEX;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRemRangeByRank($key, $start, $stop)
@@ -1468,7 +1322,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZREMRANGEBYRANK;
         $args = [$key, $start,$stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRemRangeByScore($key, $min, $max)
@@ -1477,7 +1331,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZREMRANGEBYSCORE;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRange($key, $start, $stop, array $options = [])
@@ -1487,7 +1341,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $start, $stop];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRangeByScore($key, $max, $min, array $options = [])
@@ -1497,7 +1351,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key,$max,$min];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRank($key, $member)
@@ -1506,7 +1360,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZREVRANK;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zScore($key, $member)
@@ -1515,7 +1369,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZSCORE;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function scan($cursor, array $options = [])
@@ -1524,7 +1378,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sScan($key, $cursor, array $options = [])
@@ -1534,7 +1388,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hScan($key, $cursor, array $options = [])
@@ -1544,7 +1398,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key, $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zScan($key, $cursor, array $options = [])
@@ -1554,7 +1408,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key , $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sInter(...$keys)
@@ -1563,7 +1417,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SINTER;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sInterStore($dst, ...$keys)
@@ -1573,7 +1427,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sIsMember($key, $member)
@@ -1582,7 +1436,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SISMEMBER;
         $args = [$key ,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function slaveOf($host, $port)
@@ -1591,7 +1445,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SLAVEOF;
         $args = [$host, $port];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sLowLog($command, array $args = [])
@@ -1600,7 +1454,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SLOWLOG;
         $args = array_merge([$command],$args);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sMembers($key)
@@ -1609,7 +1463,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SMEMBERS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sMove($src, $dst, $members)
@@ -1619,7 +1473,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$src, $dst];
         $args = array_merge( $args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sort($key, array $options = [])
@@ -1629,7 +1483,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sPop($key, $count)
@@ -1638,7 +1492,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SPOP;
         $args = [$key, $count];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sRandMember($key, $count)
@@ -1647,7 +1501,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SRANDMEMBER;
         $args = [$key, $count];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sRem($key, ...$members)
@@ -1657,7 +1511,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function strLen($key)
@@ -1666,7 +1520,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::STRLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function subscribe(...$channels)
@@ -1675,7 +1529,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SUBSCRIBE;
         $args = $channels;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sUnion(...$keys)
@@ -1684,7 +1538,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SUNION;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sUnionStore($dst, ...$keys)
@@ -1694,7 +1548,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sWapBb($opt, $dst, ...$keys)
@@ -1704,7 +1558,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$opt, $dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sAdd($key, ...$members)
@@ -1714,7 +1568,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function save()
@@ -1722,7 +1576,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement save() method.
         $command = Enum::SAVE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function sCard($key)
@@ -1731,7 +1585,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SCARD;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sDiff(...$keys)
@@ -1740,7 +1594,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::SDIFF;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sDiffStore($dst, ...$keys)
@@ -1750,7 +1604,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1762,7 +1616,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::HEXISTS;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1773,7 +1627,7 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         // TODO: Implement readWrite() method.
         $command = Enum::READWRITE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     /**
@@ -1785,6 +1639,6 @@ class Client extends EventEmitter implements EventEmitterInterface,CommandInterf
         $command = Enum::ZUNIIONSCORE;
         $args = [$dst, $numKeys];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 };
