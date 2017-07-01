@@ -2,7 +2,7 @@
 
 namespace Dazzle\Redis\Command;
 
-use Clue\Redis\Protocol\Model\Request;
+use Dazzle\Redis\Driver\Request;
 
 class Builder
 {

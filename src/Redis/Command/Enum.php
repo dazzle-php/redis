@@ -1,9 +1,10 @@
 <?php
 namespace Dazzle\Redis\Command;
 
+use Dazzle\Util\Enum\EnumInterface;
 use Dazzle\Util\Enum\EnumTrait;
 
-class Enum
+class Enum implements EnumInterface
 {
     use EnumTrait;
 

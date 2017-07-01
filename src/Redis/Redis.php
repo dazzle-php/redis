@@ -2,240 +2,321 @@
 
 namespace Dazzle\Redis;
 
-use Dazzle\Throwable\Exception\LogicException;
-use RuntimeException;
-use Dazzle\Loop\Loop;
-use UnderflowException;
-use Dazzle\Promise\Promise;
-use Dazzle\Promise\Deferred;
-use Dazzle\Socket\Socket;
-use Dazzle\Redis\Command\Enum;
-use Dazzle\Redis\Protocol\Resp;
-use Dazzle\Redis\Command\Builder;
-use Dazzle\Event\EventEmitter;
-use Dazzle\Loop\LoopInterface;
-use Dazzle\Loop\Model\SelectLoop;
-use Dazzle\Promise\PromiseInterface;
-use Dazzle\Event\EventEmitterInterface;
-use Dazzle\Redis\Command\CommandInterface;
-use Clue\Redis\Protocol\Model\Request;
 use Clue\Redis\Protocol\Model\ErrorReply;
 use Clue\Redis\Protocol\Model\ModelInterface;
 use Clue\Redis\Protocol\Parser\ParserException;
-use Closure;
+use Dazzle\Event\BaseEventEmitter;
+use Dazzle\Loop\LoopAwareTrait;
+use Dazzle\Loop\LoopInterface;
+use Dazzle\Promise\Deferred;
+use Dazzle\Promise\PromiseInterface;
+use Dazzle\Redis\Command\Enum;
+use Dazzle\Redis\Driver\Request;
+use Dazzle\Redis\Driver\Driver;
+use Dazzle\Redis\Driver\DriverInterface;
+use Dazzle\Redis\Command\Builder;
+use Dazzle\Socket\Socket;
+use Dazzle\Socket\SocketInterface;
+use Dazzle\Throwable\Exception\Runtime\ExecutionException;
+use Dazzle\Throwable\Exception\Runtime\UnderflowException;
+use Error;
+use Exception;
 
-class Client extends EventEmitter implements EventEmitterInterface,CommandInterface
+class Redis extends BaseEventEmitter implements RedisInterface
 {
-    private $ending;
-    private $closed;
-    private $keys;
-    private $cluster;
-    private $connection;
-    private $geo;
-    private $hashed;
-    private $hypeLogLog;
-    private $lists;
-    private $pubSub;
-    private $scripting;
-    private $server;
-    private $sets;
-    private $sortedSets;
-    private $strings;
-    private $transactions;
-
-    public $serverVersion;
-    /**
-     * @var Socket
-     */
-    private $stream;
-    /**
-     * @var Resp
-     */
-    private $protocol;
-    /**
-     * @var Loop $loop
-     */
-    private $loop;
-    protected $requests;
+    use LoopAwareTrait;
 
     /**
-     * @overwrite
-     * @param string $uri
+     * @var string
+     */
+    protected $endpoint;
+
+    /**
+     * @var SocketInterface
+     */
+    protected $stream;
+
+    /**
+     * @var DriverInterface
+     */
+    protected $driver;
+
+    /**
+     * @var bool
+     */
+    protected $isConnected;
+
+    /**
+     * @var bool
+     */
+    protected $isBeingDisconnected;
+
+    /**
+     * @var array
+     */
+    private $reqs;
+
+    /**
+     * @param string $endpoint
      * @param LoopInterface $loop
      */
-    public function __construct($uri, LoopInterface $loop)
+    public function __construct($endpoint, LoopInterface $loop)
     {
-        parent::__construct($loop);
-        $this->uri = $uri;
+        $this->endpoint = $endpoint;
         $this->loop = $loop;
         $this->stream = null;
-        $this->protocol = new Resp();
-        $this->requests = [];
-        $this->ending = false;
-        $this->closed = false;
-        $this->on('response',[$this, 'handleResponse']);
-        $this->on('close', [$this, 'handleClose']);
-        $this->on('disconnect',[$this, 'handleDisconnect']);
+        $this->driver = new Driver();
+
+        $this->isConnected = false;
+        $this->isBeingDisconnected = false;
+
+        $this->reqs = [];
     }
 
-    private function connection($uri)
+    /**
+     *
+     */
+    public function __destruct()
     {
-        try {
-            $stream = new Socket($uri, $this->loop);
+        $this->stop();
+    }
 
-            return $stream;
-        } catch (LogicException $e) {
-            $this->end();
-            $this->loop->stop();
-        } catch (\Exception $e) {
-            $this->end();
-            $this->loop->stop();
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function isStarted()
+    {
+        return $this->isConnected;
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function isBusy()
+    {
+        return !empty($this->reqs);
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function start()
+    {
+        if ($this->isStarted())
+        {
+            return false;
         }
 
-        return null;
+        $ex = null;
+        $stream = null;
+
+        try
+        {
+            $stream = $this->createClient($this->endpoint);
+        }
+        catch (Error $ex)
+        {}
+        catch (Exception $ex)
+        {}
+
+        if ($ex !== null)
+        {
+            return false;
+        }
+
+        $this->isConnected = true;
+        $this->isBeingDisconnected = false;
+        $this->stream = $stream;
+
+        // TODO patch missing pub/sub, pipeline, auth
+        $this->handleStart();
+        $this->emit('start', [ $this ]);
+
+        return true;
     }
 
-    private function dispatch(Request $command)
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function stop()
+    {
+        if (!$this->isStarted())
+        {
+            return false;
+        }
+
+        $this->isBeingDisconnected = true;
+        $this->isConnected = false;
+
+        $this->stream->close();
+        $this->stream = null;
+
+        foreach ($this->reqs as $req)
+        {
+            $req->reject(new ExecutionException('Connection has been closed!'));
+        }
+
+        $this->reqs = [];
+
+         // TODO patch missing pub/sub, pipeline, auth
+        $this->handleStop();
+        $this->emit('stop', [ $this ]);
+
+        return true;
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function end()
+    {
+        if (!$this->isStarted() || $this->isBeingDisconnected)
+        {
+            return false;
+        }
+
+        $this->isBeingDisconnected = true;
+
+        return true;
+    }
+
+    /**
+     * Dispatch Redis request.
+     *
+     * @param Request $command
+     * @return PromiseInterface
+     */
+    protected function dispatch(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
-        if ($this->ending) {
-            $request->reject(new RuntimeException('Connection closed'));
-        } else {
-            $this->stream->write($this->protocol->commands($command));
-            $this->requests[] = $request;
+
+        if ($this->isBeingDisconnected)
+        {
+            $request->reject(new ExecutionException('Redis client connection is being stopped now.'));
+        }
+        else
+        {
+            $this->stream->write($this->driver->commands($command));
+            $this->reqs[] = $request;
         }
 
         return $promise;
     }
 
-    protected function isBusy()
+    /**
+     * @internal
+     */
+    protected function handleStart()
     {
-        return empty($this->requests) ? false : true;
-    }
-
-    public function connect()
-    {
-        if ($this->stream !== null) {
-            return;
+        if ($this->stream !== null)
+        {
+            $this->stream->on('data', [ $this, 'handleData' ]);
+            $this->stream->on('close', [ $this, 'stop' ]);
         }
-
-        $this->stream = $this->connection($this->uri);
-        if ($this->stream->isOpen()) {
-            $this->on('connect',[$this , 'handleConnect']);
-        }
-
-        //todo ; patch missing pub/sub,pipeline,auth
-        $this->emit('connect', [$this]);
-    }
-
-    public function run(Closure $onConnect = null, Closure $onDisconnect = null)
-    {
-        if ($onConnect) {
-            $this->on('connect', $onConnect);
-        }
-
-        if ($onDisconnect) {
-            $this->on('disconnect', $onDisconnect);
-        }
-
-        $this->connect();
-        $this->loop->start();
     }
 
     /**
      * @internal
      */
-    public function handleConnect()
+    protected function handleStop()
     {
-        $protocol = $this->protocol;
-        $that = $this;
+        if ($this->stream !== null)
+        {
+            $this->stream->removeListener('data', [ $this, 'handleData' ]);
+            $this->stream->removeListener('close', [ $this, 'stop' ]);
+        }
+    }
 
-        $this->stream->on('data', function($_, $chunk) use ($protocol, $that) {
-            try {
-                $models = $protocol->parseResponse($chunk);
-            } catch (ParserException $error) {
-                $this->ending = true;
-                $that->emit('error', [$error]);
-                $that->emit('close');
+    /**
+     * @internal
+     * @param SocketInterface $stream
+     * @param string $chunk
+     */
+    public function handleData($stream, $chunk)
+    {
+        try
+        {
+            $models = $this->driver->parseResponse($chunk);
+        }
+        catch (ParserException $error)
+        {
+            $this->emit('error', [ $this, $error ]);
+            $this->stop();
+            return;
+        }
 
+        foreach ($models as $data)
+        {
+            try
+            {
+                $this->handleMessage($data);
+            }
+            catch (UnderflowException $error)
+            {
+                $this->emit('error', [ $this, $error ]);
+                $this->stop();
                 return;
             }
-
-            foreach ($models as $data) {
-                try {
-                    $this->emit('response', [$data]);
-                } catch (UnderflowException $error) {
-                    $this->ending = true;
-                    $that->emit('error', [$error]);
-                    $this->emit('close');
-                }
-            }
-        });
+        }
     }
 
     /**
      * @internal
+     * @param ModelInterface $message
      */
-    public function handleResponse(ModelInterface $message)
+    protected function handleMessage(ModelInterface $message)
     {
-        if (!$this->requests) {
+        if (!$this->reqs)
+        {
             throw new UnderflowException('Unexpected reply received, no matching request found');
         }
-        /* @var Deferred $request */
-        $request = array_shift($this->requests);
-        if ($message instanceof ErrorReply) {
+
+        $request = array_shift($this->reqs);
+
+        if ($message instanceof ErrorReply)
+        {
             $request->reject($message);
-        } else {
+        }
+        else
+        {
             $request->resolve($message->getValueNative());
         }
-        if (!$this->isBusy()) {
-            $this->emit('close');
+
+        if ($this->isBeingDisconnected && !$this->isBusy())
+        {
+            $this->stop();
         }
     }
 
     /**
-     * @internal
+     * Create socket client with connection to Redis database.
+     *
+     * @param string $endpoint
+     * @return SocketInterface
+     * @throws ExecutionException
      */
-    public function handleDisconnect()
+    protected function createClient($endpoint)
     {
-        $this->removeListener('connect', [ $this, 'handleConnect' ]);
-        $this->removeListener('disconnect', [ $this, 'handleDisconnect' ]);
-        $this->removeListener('error', [ $this, 'handleError' ]);
-        $this->removeListener('close', [ $this, 'handleClose']);
+        $ex = null;
+
+        try
+        {
+            return new Socket($endpoint, $this->loop);
+        }
+        catch (Error $ex)
+        {}
+        catch (Exception $ex)
+        {}
+
+        throw new ExecutionException('Redis connection socket could not be created!', 0, $ex);
     }
 
-    /**
-     * @internal
-     */
-    public function handleClose()
-    {
-        if ($this->closed) {
-            return;
-        }
-        $this->ending = true;
-        $this->closed = true;
-        $this->stream->close();
-        $this->emit('disconnect');
-        // reject all remaining requests in the queue
-        while($this->requests) {
-            $request = array_shift($this->requests);
-            /* @var $request Deferred */
-            $request->reject(new RuntimeException('Connection closing'));
-        }
-        $this->loop->stop();
-    }
-
-    public function end()
-    {
-        if (!$this->ending) {
-            $this->ending = true;
-        }
-    }
-
-    /**
-     * Commands ...
-     */
     public function auth($password)
     {
         $command = Enum::AUTH;
