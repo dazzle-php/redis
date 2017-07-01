@@ -25,8 +25,12 @@
     ],
     "require": {
         "php": ">=5.6.7",
+        "dazzle-php/event": "0.5.*",
+        "dazzle-php/loop": "0.5.*",
         "dazzle-php/promise": "0.5.*",
         "dazzle-php/socket": "0.5.*",
+        "dazzle-php/throwable": "0.5.*",
+        "dazzle-php/util": "0.5.*",
         "clue/redis-protocol": "0.3.*"
     },
     "require-dev": {
