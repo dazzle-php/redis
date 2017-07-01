@@ -1,6 +1,6 @@
 <?php
 
-namespace Kraken\Redis\Command;
+namespace Dazzle\Redis\Command;
 
 use Clue\Redis\Protocol\Model\Request;
 

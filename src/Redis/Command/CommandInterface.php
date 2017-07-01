@@ -1,6 +1,6 @@
 <?php
 
-namespace Kraken\Redis\Command;
+namespace Dazzle\Redis\Command;
 
 interface CommandInterface
 {

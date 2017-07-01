@@ -1,6 +1,6 @@
 <?php
 
-namespace Kraken\Redis;
+namespace Dazzle\Redis;
 
 use InvalidArgumentException;
 

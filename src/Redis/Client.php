@@ -1,24 +1,24 @@
 <?php
 
-namespace Kraken\Redis;
+namespace Dazzle\Redis;
 
-use Kraken\Throwable\Exception\LogicException;
+use Dazzle\Throwable\Exception\LogicException;
 use RuntimeException;
-use Kraken\Loop\Loop;
+use Dazzle\Loop\Loop;
 use UnderflowException;
-use Kraken\Promise\Promise;
-use Kraken\Promise\Deferred;
-use Kraken\Ipc\Socket\Socket;
-use Kraken\Redis\Command\Enum;
-use Kraken\Redis\Protocol\Resp;
-use Kraken\Redis\Command\Builder;
-use Kraken\Event\EventEmitter;
-use Kraken\Loop\LoopInterface;
-use Kraken\Loop\Model\SelectLoop;
-use Kraken\Promise\PromiseInterface;
+use Dazzle\Promise\Promise;
+use Dazzle\Promise\Deferred;
+use Dazzle\Socket\Socket;
+use Dazzle\Redis\Command\Enum;
+use Dazzle\Redis\Protocol\Resp;
+use Dazzle\Redis\Command\Builder;
+use Dazzle\Event\EventEmitter;
+use Dazzle\Loop\LoopInterface;
+use Dazzle\Loop\Model\SelectLoop;
+use Dazzle\Promise\PromiseInterface;
+use Dazzle\Event\EventEmitterInterface;
+use Dazzle\Redis\Command\CommandInterface;
 use Clue\Redis\Protocol\Model\Request;
-use Kraken\Event\EventEmitterInterface;
-use Kraken\Redis\Command\CommandInterface;
 use Clue\Redis\Protocol\Model\ErrorReply;
 use Clue\Redis\Protocol\Model\ModelInterface;
 use Clue\Redis\Protocol\Parser\ParserException;

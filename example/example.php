@@ -1,15 +1,15 @@
 <?php
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Kraken\Loop\Loop;
-use Kraken\Redis\Client;
-use Kraken\Loop\Model\SelectLoop;
-use Kraken\Promise\Promise;
-#examples
+use Dazzle\Loop\Model\SelectLoop;
+use Dazzle\Loop\Loop;
+use Dazzle\Redis\Client;
 
 $loop = new Loop(new SelectLoop());
 
-$client = new Client('192.168.99.100:32769', $loop);
+// $client = new Client('192.168.99.100:32769', $loop);
+$client = new Client('127.0.0.1:6379', $loop);
 
 $ret = [];
 
@@ -24,7 +24,7 @@ $client->on('connect', function (Client $client) {
 
     $client->set('test2','test2');
 
-    $client->set('test','Hello Kraken Redis!')->then(function ($value) {
+    $client->set('test','Hello Dazzle Redis!')->then(function ($value) {
         global $ret;
         $ret[] = $value;
     });
