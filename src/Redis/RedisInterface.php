@@ -10,7 +10,7 @@ use Dazzle\Event\EventEmitterInterface;
  * @event stop  : callable(object)
  * @event error : callable(object, Error|Exception)
  */
-interface RedisInterface extends EventEmitterInterface, CommandInterface
+interface RedisInterface extends CommandInterface
 {
     /**
      * Check if Redis client has been started.

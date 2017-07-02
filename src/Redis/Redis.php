@@ -2,59 +2,21 @@
 
 namespace Dazzle\Redis;
 
-use Clue\Redis\Protocol\Model\ErrorReply;
-use Clue\Redis\Protocol\Model\ModelInterface;
-use Clue\Redis\Protocol\Parser\ParserException;
-use Dazzle\Event\BaseEventEmitter;
-use Dazzle\Loop\LoopAwareTrait;
-use Dazzle\Loop\LoopInterface;
-use Dazzle\Promise\Deferred;
-use Dazzle\Promise\PromiseInterface;
 use Dazzle\Redis\Command\Enum;
 use Dazzle\Redis\Driver\Request;
-use Dazzle\Redis\Driver\Driver;
-use Dazzle\Redis\Driver\DriverInterface;
 use Dazzle\Redis\Command\Builder;
-use Dazzle\Socket\Socket;
-use Dazzle\Socket\SocketInterface;
-use Dazzle\Throwable\Exception\Runtime\ExecutionException;
-use Dazzle\Throwable\Exception\Runtime\UnderflowException;
+use Dazzle\Loop\LoopInterface;
+use Dazzle\Promise\PromiseInterface;
+use Dazzle\Promise\Deferred;
+use Dazzle\Throwable\Exception\RuntimeException;
 use Error;
-use Exception;
 
-class Redis extends BaseEventEmitter implements RedisInterface
+class Redis
 {
-    use LoopAwareTrait;
-
     /**
      * @var string
      */
     protected $endpoint;
-
-    /**
-     * @var SocketInterface
-     */
-    protected $stream;
-
-    /**
-     * @var DriverInterface
-     */
-    protected $driver;
-
-    /**
-     * @var bool
-     */
-    protected $isConnected;
-
-    /**
-     * @var bool
-     */
-    protected $isBeingDisconnected;
-
-    /**
-     * @var array
-     */
-    private $reqs;
 
     /**
      * @param string $endpoint
@@ -64,13 +26,8 @@ class Redis extends BaseEventEmitter implements RedisInterface
     {
         $this->endpoint = $endpoint;
         $this->loop = $loop;
-        $this->stream = null;
-        $this->driver = new Driver();
-
-        $this->isConnected = false;
-        $this->isBeingDisconnected = false;
-
-        $this->reqs = [];
+        $this->dispatcher = new Dispatcher($loop);
+        $this->driver = $this->dispatcher->getDriver();
     }
 
     /**
@@ -78,243 +35,40 @@ class Redis extends BaseEventEmitter implements RedisInterface
      */
     public function __destruct()
     {
-        $this->stop();
+
     }
 
     /**
-     * @override
-     * @inheritDoc
-     */
-    public function isStarted()
-    {
-        return $this->isConnected;
-    }
-
-    /**
-     * @override
-     * @inheritDoc
-     */
-    public function isBusy()
-    {
-        return !empty($this->reqs);
-    }
-
-    /**
-     * @override
-     * @inheritDoc
-     */
-    public function start()
-    {
-        if ($this->isStarted())
-        {
-            return false;
-        }
-
-        $ex = null;
-        $stream = null;
-
-        try
-        {
-            $stream = $this->createClient($this->endpoint);
-        }
-        catch (Error $ex)
-        {}
-        catch (Exception $ex)
-        {}
-
-        if ($ex !== null)
-        {
-            return false;
-        }
-
-        $this->isConnected = true;
-        $this->isBeingDisconnected = false;
-        $this->stream = $stream;
-
-        // TODO patch missing pub/sub, pipeline, auth
-        $this->handleStart();
-        $this->emit('start', [ $this ]);
-
-        return true;
-    }
-
-    /**
-     * @override
-     * @inheritDoc
-     */
-    public function stop()
-    {
-        if (!$this->isStarted())
-        {
-            return false;
-        }
-
-        $this->isBeingDisconnected = true;
-        $this->isConnected = false;
-
-        $this->stream->close();
-        $this->stream = null;
-
-        foreach ($this->reqs as $req)
-        {
-            $req->reject(new ExecutionException('Connection has been closed!'));
-        }
-
-        $this->reqs = [];
-
-         // TODO patch missing pub/sub, pipeline, auth
-        $this->handleStop();
-        $this->emit('stop', [ $this ]);
-
-        return true;
-    }
-
-    /**
-     * @override
-     * @inheritDoc
-     */
-    public function end()
-    {
-        if (!$this->isStarted() || $this->isBeingDisconnected)
-        {
-            return false;
-        }
-
-        $this->isBeingDisconnected = true;
-
-        return true;
-    }
-
-    /**
-     * Dispatch Redis request.
+     * Pipe Redis request.
      *
      * @param Request $command
      * @return PromiseInterface
      */
-    protected function dispatch(Request $command)
+    private function pipe(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
+        if ($this->dispatcher->isEnding())
+        {
+            $request->reject(new RuntimeException('Connection closed'));
+        } 
+        else 
+        {
+            $payload = $this->driver->commands($command);
 
-        if ($this->isBeingDisconnected)
-        {
-            $request->reject(new ExecutionException('Redis client connection is being stopped now.'));
-        }
-        else
-        {
-            $this->stream->write($this->driver->commands($command));
-            $this->reqs[] = $request;
+            $this->dispatcher->on('request', function () use ($payload) {
+                $this->dispatcher->handleRequest($payload);
+            });
+
+            $this->dispatcher->appendRequest($request);
         }
 
         return $promise;
     }
 
-    /**
-     * @internal
-     */
-    protected function handleStart()
+    public function connect($config = [])
     {
-        if ($this->stream !== null)
-        {
-            $this->stream->on('data', [ $this, 'handleData' ]);
-            $this->stream->on('close', [ $this, 'stop' ]);
-        }
-    }
-
-    /**
-     * @internal
-     */
-    protected function handleStop()
-    {
-        if ($this->stream !== null)
-        {
-            $this->stream->removeListener('data', [ $this, 'handleData' ]);
-            $this->stream->removeListener('close', [ $this, 'stop' ]);
-        }
-    }
-
-    /**
-     * @internal
-     * @param SocketInterface $stream
-     * @param string $chunk
-     */
-    public function handleData($stream, $chunk)
-    {
-        try
-        {
-            $models = $this->driver->parseResponse($chunk);
-        }
-        catch (ParserException $error)
-        {
-            $this->emit('error', [ $this, $error ]);
-            $this->stop();
-            return;
-        }
-
-        foreach ($models as $data)
-        {
-            try
-            {
-                $this->handleMessage($data);
-            }
-            catch (UnderflowException $error)
-            {
-                $this->emit('error', [ $this, $error ]);
-                $this->stop();
-                return;
-            }
-        }
-    }
-
-    /**
-     * @internal
-     * @param ModelInterface $message
-     */
-    protected function handleMessage(ModelInterface $message)
-    {
-        if (!$this->reqs)
-        {
-            throw new UnderflowException('Unexpected reply received, no matching request found');
-        }
-
-        $request = array_shift($this->reqs);
-
-        if ($message instanceof ErrorReply)
-        {
-            $request->reject($message);
-        }
-        else
-        {
-            $request->resolve($message->getValueNative());
-        }
-
-        if ($this->isBeingDisconnected && !$this->isBusy())
-        {
-            $this->stop();
-        }
-    }
-
-    /**
-     * Create socket client with connection to Redis database.
-     *
-     * @param string $endpoint
-     * @return SocketInterface
-     * @throws ExecutionException
-     */
-    protected function createClient($endpoint)
-    {
-        $ex = null;
-
-        try
-        {
-            return new Socket($endpoint, $this->loop);
-        }
-        catch (Error $ex)
-        {}
-        catch (Exception $ex)
-        {}
-
-        throw new ExecutionException('Redis connection socket could not be created!', 0, $ex);
+        $this->dispatcher->watch($this->endpoint);
     }
 
     public function auth($password)
@@ -322,7 +76,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::AUTH;
         $args = [$password];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function append($key, $value)
@@ -330,21 +84,21 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::APPEND;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bgRewriteAoF()
     {
         $command = Enum::BGREWRITEAOF;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function bgSave()
     {
         $command = Enum::BGSAVE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function bitCount($key, $start = 0, $end = 0)
@@ -352,7 +106,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::BITCOUNT;
         $args = [$key, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitField($key, $subCommand = null, ...$param)
@@ -386,7 +140,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         }
         $args = array_filter($args);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitOp($operation, $dstKey, $srcKey, ...$keys)
@@ -395,7 +149,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$operation, $dstKey, $srcKey];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function bitPos($key, $bit, $start = 0, $end = 0)
@@ -403,16 +157,15 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::BITPOS;
         $args = [$key, $bit, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function blPop(array $keys, $timeout)
     {
-        // TODO: Implement blPop() method.
         $command = Enum::BLPOP;
         $keys[] = $timeout;
         $args = $keys;
-        $promise = $this->dispatch(Builder::build($command, $args));
+        $promise = $this->pipe(Builder::build($command, $args));
         $promise = $promise->then(function ($value) {
             if (is_array($value)) {
                 list($k,$v) = $value;
@@ -431,11 +184,10 @@ class Redis extends BaseEventEmitter implements RedisInterface
 
     public function brPop(array $keys, $timeout)
     {
-        // TODO: Implement brPop() method.
         $command = Enum::BRPOP;
         $keys[] = $timeout;
         $args = $keys;
-        $promise = $this->dispatch(Builder::build($command, $args));
+        $promise = $this->pipe(Builder::build($command, $args));
         $promise = $promise->then(function ($value) {
             if (is_array($value)) {
                 list($k,$v) = $value;
@@ -454,29 +206,26 @@ class Redis extends BaseEventEmitter implements RedisInterface
 
     public function brPopLPush($src, $dst, $timeout)
     {
-        // TODO: Implement brPopLPush() method.
         $command = Enum::BRPOPLPUSH;
         $args = [$src, $dst, $timeout];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function decr($key)
     {
-        // TODO: Implement decr() method.
         $command = Enum::DECR;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function decrBy($key, $decrement)
     {
-        // TODO: Implement decrBy() method.
         $command = Enum::DECRBY;
         $args = [$key, $decrement];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function del($key,...$keys)
@@ -485,52 +234,47 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $keys[] = $key;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function discard()
     {
-        // TODO: Implement discard() method.
         $command = Enum::DISCARD;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function dump($key)
     {
-        // TODO: Implement dump() method.
         $command = Enum::DUMP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function exists($key, ...$keys)
     {
-        // TODO: Implement exists() method.
         $command = Enum::EXISTS;
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function expire($key, $seconds)
     {
-        // TODO: Implement expire() method.
         $command = Enum::EXPIRE;
         $args = [$key, $seconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function expireAt($key, $timestamp)
     {
-        // TODO: Implement expireAt() method.
         $command = Enum::EXPIREAT;
         $args = [$key, $timestamp];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function get($key)
@@ -538,34 +282,31 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::GET;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getBit($key, $offset)
     {
-        // TODO: Implement getBit() method.
         $command = Enum::GETBIT;
         $args = [$key, $offset];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getRange($key, $start, $end)
     {
-        // TODO: Implement getRange() method.
         $command = Enum::GETRANGE;
         $args = [$key, $start, $end];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function getSet($key, $value)
     {
-        // TODO: Implement getSet() method.
         $command = Enum::GETSET;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incr($key)
@@ -573,33 +314,30 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::INCR;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incrBy($key, $increment)
     {
-        // TODO: Implement incrBy() method.
         $command = Enum::INCRBY;
         $args = [$key, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function incrByFloat($key, $increment)
     {
-        // TODO: Implement incrByFloat() method.
         $command = Enum::INCRBYFLOAT;
         $args = [$key, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function multi()
     {
-        // TODO: Implement multi() method.
         $command = Enum::MULTI;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function persist($key)
@@ -607,41 +345,37 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PERSIST;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pExpire($key, $milliseconds)
     {
-        // TODO: Implement pExpire() method.
         $command = Enum::PEXPIRE;
         $args = [$key, $milliseconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pExpireAt($key, $milliseconds)
     {
-        // TODO: Implement pExpireAt() method.
         $command = Enum::PEXPIREAT;
         $args = [$key, $milliseconds];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sync()
     {
-        // TODO: Implement sync() method.
         $command = Enum::SYNC;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function time()
     {
-        // TODO: Implement time() method.
         $command = Enum::TIME;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function touch($key, ...$keys)
@@ -650,16 +384,15 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function ttl($key)
     {
-        // TODO: Implement ttl() method.
         $command = Enum::TTL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function type($key)
@@ -667,7 +400,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::TYPE;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unLink($key, ...$keys)
@@ -676,7 +409,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unWatch()
@@ -684,7 +417,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement unWatch() method.
         $command = Enum::UNWATCH;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function wait($numSlaves, $timeout)
@@ -693,7 +426,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::WAIT;
         $args = [$numSlaves, $timeout];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function watch($key, ...$keys)
@@ -703,15 +436,15 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function select($index)
     {
-        // TODO: Implement select() method.
         $command = Enum::SELECT;
+        $args = [$index];
 
-        return $this;
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function set($key, $value, array $options = [])
@@ -720,16 +453,15 @@ class Redis extends BaseEventEmitter implements RedisInterface
         array_unshift($options, $key, $value);
         $args = $options;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setBit($key, $offset, $value)
     {
-        // TODO: Implement setBit() method.
         $command = Enum::SETBIT;
         $args = [$key, $offset, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setEx($key, $seconds, $value)
@@ -737,7 +469,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SETEX;
         $args = [$key, $seconds, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function setNx($key, $value)
@@ -745,23 +477,21 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SETNX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function randomKey()
     {
-        // TODO: Implement randomKey() method.
         $command = Enum::RANDOMKEY;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function readOnly()
     {
-        // TODO: Implement readOnly() method.
         $command = Enum::READONLY;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function rename($key, $newKey)
@@ -769,7 +499,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::RENAME;
         $args = [$key, $newKey];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function renameNx($key, $newKey)
@@ -777,16 +507,15 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::RENAMENX;
         $args = [$key, $newKey];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function restore($key, $ttl, $value)
     {
-        // TODO: Implement restore() method.
         $command = Enum::RESTORE;
         $args = [$key, $ttl, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function ping($message = 'PING')
@@ -794,14 +523,17 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PING;
         $args = [$message];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function quit()
     {
         $command = Enum::QUIT;
+        $that = $this;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command))->then(function ($_) use ($that) {
+            $that->dispatcher->emit('disconnect');
+        });
     }
 
     public function setRange($key, $offset, $value)
@@ -809,7 +541,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SETRANGE;
         $args = [$key, $offset, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pTtl($key)
@@ -817,7 +549,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PTTL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pSetEx($key, $milliseconds, $value)
@@ -825,7 +557,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PSETEX;
         $args = [$key, $milliseconds, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hDel($key, ...$fields)
@@ -834,7 +566,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $fields);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hGet($key, $field)
@@ -842,7 +574,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HGET;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hGetAll($key)
@@ -850,7 +582,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HGETALL;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args))->then(function ($value) {
+        return $this->pipe(Builder::build($command, $args))->then(function ($value) {
             if (!empty($value)) {
                 $tmp = [];
                 $size = count($value);
@@ -871,7 +603,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HINCRBY;
         $args = [$key, $field, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hIncrByFloat($key, $field, $increment)
@@ -879,7 +611,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HINCRBYFLOAT;
         $args = [$key, $field, $increment];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hKeys($key)
@@ -887,7 +619,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HKEYS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hLen($key)
@@ -895,7 +627,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hMGet($key, ...$fields)
@@ -904,7 +636,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $fields);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hMSet($key, array $fvMap)
@@ -920,7 +652,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         }
         $args = array_merge($args, $fvMap);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hSet($key, $field, $value)
@@ -928,7 +660,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HSET;
         $args = [$key, $field, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hSetNx($key, $filed, $value)
@@ -936,7 +668,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HSETNX;
         $args = [$key, $filed, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hStrLen($key, $field)
@@ -944,7 +676,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HSTRLEN;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hVals($key)
@@ -952,7 +684,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HVALS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoAdd($key, array $coordinates)
@@ -962,7 +694,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $coordinates);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoHash($key, ...$members)
@@ -978,7 +710,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoDist($key, $memberA, $memberB, $unit)
@@ -987,7 +719,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::GEODIST;
         $args = [$key, $memberA, $memberB ,$unit];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoRadius($key, $longitude, $latitude, $unit, $command, $count, $sort)
@@ -996,7 +728,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::GEORADIUS;
         $args = [$key, $longitude, $latitude, $unit, $command, $count, $sort];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function geoRadiusByMember($key, $member, $unit, $command, $count, $sort, $store, $storeDist)
@@ -1005,7 +737,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::GEORADIUSBYMEMBER;
         $args = [$key, $member, $unit, $command, $count, $sort, $store, $storeDist];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pSubscribe(...$patterns)
@@ -1014,7 +746,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PSUBSCRIBE;
         $args = $patterns;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pubSub($command, array $args = [])
@@ -1022,7 +754,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement pubSub() method.
         $command = Enum::PUBSUB;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function publish($channel, $message)
@@ -1031,7 +763,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PUBLISH;
         $args = [$channel, $message];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pUnsubscribe(...$patterns)
@@ -1040,7 +772,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PUNSUBSCRIBE;
         $args = $patterns;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function unSubscribe(...$channels)
@@ -1049,7 +781,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::UNSUBSCRIBE;
         $args = $channels;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lIndex($key, $index)
@@ -1058,7 +790,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LINDEX;
         $args = [$key, $index];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lInsert($key, $action, $pivot, $value)
@@ -1067,7 +799,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LINSERT;
         $args = [$key, $action, $pivot, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lLen($key)
@@ -1076,7 +808,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lPop($key)
@@ -1085,7 +817,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LPOP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lPush($key,...$values)
@@ -1093,7 +825,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LPUSH;
         array_unshift($values, $key);
 
-        return $this->dispatch(Builder::build($command, $values));
+        return $this->pipe(Builder::build($command, $values));
     }
 
     public function lPushX($key, $value)
@@ -1101,7 +833,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LPUSHX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lRange($key, $start = 0, $stop = -1)
@@ -1109,7 +841,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LRANGE;
         $args = [$key, $start, $stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lRem($key, $count, $value)
@@ -1118,7 +850,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LREM;
         $args = [$key, $count, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lSet($key, $index, $value)
@@ -1127,7 +859,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LSET;
         $args = [$key, $index, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function lTrim($key, $start, $stop)
@@ -1136,7 +868,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::LTRIM;
         $args = [$key, $start, $stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mGet($key, ...$values)
@@ -1146,7 +878,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $values);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mSet(array $kvMap)
@@ -1155,7 +887,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::MSET;
         $args = $kvMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function monitor()
@@ -1163,7 +895,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement monitor() method.
         $command = Enum::MONITOR;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function move($key, $db)
@@ -1172,7 +904,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::MOVE;
         $args = [$key, $db];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function mSetNx($kvMap)
@@ -1181,7 +913,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::MSETNX;
         $args = $kvMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPop($key)
@@ -1189,7 +921,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::RPOP;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPopLPush($src, $dst)
@@ -1198,7 +930,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::RPOPLPUSH;
         $args = [$src, $dst];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPush($key, ...$values)
@@ -1207,7 +939,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $values);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function rPushX($key, $value)
@@ -1215,7 +947,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::RPUSHX;
         $args = [$key, $value];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFAdd($key, ...$elements)
@@ -1225,7 +957,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $elements);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFCount(...$keys)
@@ -1234,7 +966,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PFCOUNT;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function pFMerge(array $dsKeyMap)
@@ -1243,7 +975,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::PFMERGE;
         $args = $dsKeyMap;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterAddSlots(...$slots)
@@ -1252,7 +984,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_ADDSLOTS;
         $args = $slots;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterCountFailureReports($nodeId)
@@ -1261,7 +993,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_COUNT_FAILURE_REPORTS;
         $args = [$nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterCountKeysInSlot($slot)
@@ -1270,7 +1002,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_COUNTKEYSINSLOT;
         $args = $slot;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterDelSlots(...$slots)
@@ -1279,7 +1011,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_DELSLOTS;
         $args = $slots;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterFailOver($operation)
@@ -1302,7 +1034,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement clusterInfo() method.
         $command = Enum::CLUSTER_INFO;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function clusterKeySlot($key)
@@ -1311,7 +1043,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_KEYSLOT;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterMeet($ip, $port)
@@ -1320,7 +1052,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_MEET;
         $args = [$ip, $port];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function clusterNodes()
@@ -1360,7 +1092,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_SETSLOT;
         $args = [$command, $nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1372,7 +1104,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::CLUSTER_SLAVES;
         $args = [$nodeId];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1383,29 +1115,28 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement clusterSlots() method.
         $command = Enum::CLUSTER_SLOTS;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function flushAll()
     {
         $command = Enum::FLUSHALL;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function flushDb()
     {
-        // TODO: Implement flushDb() method.
         $command = Enum::FLUSHDB;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function info($section = [])
     {
         $command = Enum::INFO;
 
-        return $this->dispatch(Builder::build($command, $section))->then(function ($value) {
+        return $this->pipe(Builder::build($command, $section))->then(function ($value) {
             if ($value) {
                 $ret = explode(PHP_EOL, $value);
                 $handled = [];
@@ -1430,41 +1161,42 @@ class Redis extends BaseEventEmitter implements RedisInterface
         });
     }
 
-    public function zAdd($key, array $options = [])
+    public function zAdd($key, array $options = [], array $scoreMembers = [])
     {
-        // TODO: Implement zAdd() method.
         $command = Enum::ZADD;
-        $args = [$key];
-        $args = array_merge($args, $options);
+        $args = array_merge([$key], $options);
+        if (!empty($scoreMembers)) {
+            foreach ($scoreMembers as $score => $member) {
+                $args[] = (float) $score;
+                $args[] = $member;
+            }
+        }
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zCard($key)
     {
-        // TODO: Implement zCard() method.
         $command = Enum::ZCARD;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zCount($key, $min, $max)
     {
-        // TODO: Implement zCount() method.
         $command = Enum::ZCOUNT;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zIncrBy($key, $increment, $member)
     {
-        // TODO: Implement zIncrBy() method.
         $command = Enum::ZINCRBY;
         $args = [$key, $increment, $member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zInterStore($dst, $numKeys)
@@ -1473,140 +1205,139 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::ZINTERSTORE;
         $args = [$dst, $numKeys];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zLexCount($key, $min, $max)
     {
-        // TODO: Implement zLexCount() method.
         $command = Enum::ZLEXCOUNT;
         $args = [$key, $min, $max];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRange($key, $star, $stop, array $options = [])
+    public function zRange($key, $star = 0, $stop = -1, $withScores = false)
     {
-        // TODO: Implement zRange() method.
         $command = Enum::ZRANGE;
-        $args = [$key, $star,$stop];
-        $args = array_merge($args, $options);
+        $args = [$key, $star, $stop];
+        if ($withScores) {
+            $args[] = 'WITHSCORES';
 
-        return $this->dispatch(Builder::build($command, $args));
+            return $this->pipe(Builder::build($command, $args))->then(function ($value) {
+                $len = count($value);
+                $ret = [];
+                for ($i=0; $i<$len; $i+=2) {
+                    $ret[$value[$i]] = $value[$i+1];
+                }
+
+                return $ret;
+            });
+        }
+
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRangeByLex($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByLex() method.
         $command = Enum::ZRANGEBYLEX;
         $args = [$key, $min, $max];
         $args = array_merge($args,$options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRangeByLex($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByLex() method.
         $command = Enum::ZREVRANGEBYLEX;
         $args = [$key, $max,$min];
         $args = array_merge($args,$options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRangeByScore($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByScore() method.
         $command = Enum::ZRANGEBYSCORE;
         $args = [$key, $min,$max];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRank($key, $member)
     {
-        // TODO: Implement zRank() method.
         $command = Enum::ZRANK;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRem($key, ...$members)
     {
-        // TODO: Implement zRem() method.
         $command = Enum::ZREM;
-        $args = [$key];
-        $args = array_merge($args, $members);
+        $args = array_merge([$key], $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRemRangeByLex($key, $min, $max)
+    public function zRemRangeByLex($key, $min, $max, $options = [])
     {
-        // TODO: Implement zRemRangeByLex() method.
         $command = Enum::ZREMRANGEBYLEX;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRemRangeByRank($key, $start, $stop)
     {
-        // TODO: Implement zRemRangeByRank() method.
         $command = Enum::ZREMRANGEBYRANK;
         $args = [$key, $start,$stop];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRemRangeByScore($key, $min, $max)
+    public function zRemRangeByScore($key, $min, $max, $options = [])
     {
-        // TODO: Implement zRemRangeByScore() method.
         $command = Enum::ZREMRANGEBYSCORE;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRange($key, $start, $stop, array $options = [])
     {
-        // TODO: Implement zRevRange() method.
         $command = Enum::ZREVRANGE;
         $args = [$key, $start, $stop];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRangeByScore($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByScore() method.
         $command = Enum::ZREVRANGEBYSCORE;
         $args = [$key,$max,$min];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRank($key, $member)
     {
-        // TODO: Implement zRevRank() method.
         $command = Enum::ZREVRANK;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zScore($key, $member)
     {
-        // TODO: Implement zScore() method.
         $command = Enum::ZSCORE;
         $args = [$key,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function scan($cursor, array $options = [])
@@ -1615,7 +1346,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sScan($key, $cursor, array $options = [])
@@ -1625,7 +1356,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key, $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function hScan($key, $cursor, array $options = [])
@@ -1635,7 +1366,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key, $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function zScan($key, $cursor, array $options = [])
@@ -1645,7 +1376,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key , $cursor];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sInter(...$keys)
@@ -1654,7 +1385,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SINTER;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sInterStore($dst, ...$keys)
@@ -1664,7 +1395,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sIsMember($key, $member)
@@ -1673,7 +1404,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SISMEMBER;
         $args = [$key ,$member];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function slaveOf($host, $port)
@@ -1682,7 +1413,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SLAVEOF;
         $args = [$host, $port];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sLowLog($command, array $args = [])
@@ -1691,7 +1422,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SLOWLOG;
         $args = array_merge([$command],$args);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sMembers($key)
@@ -1700,7 +1431,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SMEMBERS;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sMove($src, $dst, $members)
@@ -1710,7 +1441,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$src, $dst];
         $args = array_merge( $args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sort($key, array $options = [])
@@ -1720,7 +1451,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sPop($key, $count)
@@ -1729,7 +1460,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SPOP;
         $args = [$key, $count];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sRandMember($key, $count)
@@ -1738,7 +1469,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SRANDMEMBER;
         $args = [$key, $count];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sRem($key, ...$members)
@@ -1748,7 +1479,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function strLen($key)
@@ -1757,7 +1488,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::STRLEN;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function subscribe(...$channels)
@@ -1766,7 +1497,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SUBSCRIBE;
         $args = $channels;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sUnion(...$keys)
@@ -1775,7 +1506,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SUNION;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sUnionStore($dst, ...$keys)
@@ -1785,7 +1516,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sWapBb($opt, $dst, ...$keys)
@@ -1795,7 +1526,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$opt, $dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sAdd($key, ...$members)
@@ -1805,7 +1536,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$key];
         $args = array_merge($args, $members);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function save()
@@ -1813,7 +1544,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement save() method.
         $command = Enum::SAVE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     public function sCard($key)
@@ -1822,7 +1553,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SCARD;
         $args = [$key];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sDiff(...$keys)
@@ -1831,7 +1562,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::SDIFF;
         $args = $keys;
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function sDiffStore($dst, ...$keys)
@@ -1841,7 +1572,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $args = [$dst];
         $args = array_merge($args, $keys);
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1853,7 +1584,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::HEXISTS;
         $args = [$key, $field];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 
     /**
@@ -1864,7 +1595,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         // TODO: Implement readWrite() method.
         $command = Enum::READWRITE;
 
-        return $this->dispatch(Builder::build($command));
+        return $this->pipe(Builder::build($command));
     }
 
     /**
@@ -1876,6 +1607,6 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $command = Enum::ZUNIIONSCORE;
         $args = [$dst, $numKeys];
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $this->pipe(Builder::build($command, $args));
     }
 };
