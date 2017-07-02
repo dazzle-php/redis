@@ -1,6 +1,6 @@
 <?php
 
-namespace Dazzle\Redis\Test\TModule;
+namespace Dazzle\Redis\Test\TModule\Command;
 
 use Dazzle\Promise\Promise;
 use Dazzle\Redis\Redis;
@@ -8,7 +8,7 @@ use Dazzle\Redis\RedisInterface;
 use Dazzle\Redis\Test\TModule;
 use Dazzle\Redis\Test\TModule\_Support\RedisTrait;
 
-class RedisTest extends TModule
+class RedisApiKeyValTest extends TModule
 {
     use RedisTrait;
 
