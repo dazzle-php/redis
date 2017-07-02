@@ -12,25 +12,6 @@ use Kraken\Redis\Command\CommandInterface;
 
 class Client implements CommandInterface
 {
-    private $keys;
-    private $cluster;
-    private $connection;
-    private $geo;
-    private $hashed;
-    private $hypeLogLog;
-    private $lists;
-    private $pubSub;
-    private $scripting;
-    private $server;
-    private $sets;
-    private $sortedSets;
-    private $strings;
-    private $transactions;
-
-    public $serverVersion;
-
-    private $protocol;
-
     /**
      * @overwrite
      * @param string $uri
@@ -158,7 +139,6 @@ class Client implements CommandInterface
 
     public function blPop(array $keys, $timeout)
     {
-        // TODO: Implement blPop() method.
         $command = Enum::BLPOP;
         $keys[] = $timeout;
         $args = $keys;
@@ -181,7 +161,6 @@ class Client implements CommandInterface
 
     public function brPop(array $keys, $timeout)
     {
-        // TODO: Implement brPop() method.
         $command = Enum::BRPOP;
         $keys[] = $timeout;
         $args = $keys;
@@ -204,7 +183,6 @@ class Client implements CommandInterface
 
     public function brPopLPush($src, $dst, $timeout)
     {
-        // TODO: Implement brPopLPush() method.
         $command = Enum::BRPOPLPUSH;
         $args = [$src, $dst, $timeout];
 
@@ -213,7 +191,6 @@ class Client implements CommandInterface
 
     public function decr($key)
     {
-        // TODO: Implement decr() method.
         $command = Enum::DECR;
         $args = [$key];
 
@@ -222,7 +199,6 @@ class Client implements CommandInterface
 
     public function decrBy($key, $decrement)
     {
-        // TODO: Implement decrBy() method.
         $command = Enum::DECRBY;
         $args = [$key, $decrement];
 
@@ -240,7 +216,6 @@ class Client implements CommandInterface
 
     public function discard()
     {
-        // TODO: Implement discard() method.
         $command = Enum::DISCARD;
 
         return $this->pipe(Builder::build($command));
@@ -248,7 +223,6 @@ class Client implements CommandInterface
 
     public function dump($key)
     {
-        // TODO: Implement dump() method.
         $command = Enum::DUMP;
         $args = [$key];
 
@@ -257,7 +231,6 @@ class Client implements CommandInterface
 
     public function exists($key, ...$keys)
     {
-        // TODO: Implement exists() method.
         $command = Enum::EXISTS;
         $args = [$key];
         $args = array_merge($args, $keys);
@@ -267,7 +240,6 @@ class Client implements CommandInterface
 
     public function expire($key, $seconds)
     {
-        // TODO: Implement expire() method.
         $command = Enum::EXPIRE;
         $args = [$key, $seconds];
 
@@ -276,7 +248,6 @@ class Client implements CommandInterface
 
     public function expireAt($key, $timestamp)
     {
-        // TODO: Implement expireAt() method.
         $command = Enum::EXPIREAT;
         $args = [$key, $timestamp];
 
@@ -293,7 +264,6 @@ class Client implements CommandInterface
 
     public function getBit($key, $offset)
     {
-        // TODO: Implement getBit() method.
         $command = Enum::GETBIT;
         $args = [$key, $offset];
 
@@ -302,7 +272,6 @@ class Client implements CommandInterface
 
     public function getRange($key, $start, $end)
     {
-        // TODO: Implement getRange() method.
         $command = Enum::GETRANGE;
         $args = [$key, $start, $end];
 
@@ -311,7 +280,6 @@ class Client implements CommandInterface
 
     public function getSet($key, $value)
     {
-        // TODO: Implement getSet() method.
         $command = Enum::GETSET;
         $args = [$key, $value];
 
@@ -328,7 +296,6 @@ class Client implements CommandInterface
 
     public function incrBy($key, $increment)
     {
-        // TODO: Implement incrBy() method.
         $command = Enum::INCRBY;
         $args = [$key, $increment];
 
@@ -337,7 +304,6 @@ class Client implements CommandInterface
 
     public function incrByFloat($key, $increment)
     {
-        // TODO: Implement incrByFloat() method.
         $command = Enum::INCRBYFLOAT;
         $args = [$key, $increment];
 
@@ -346,7 +312,6 @@ class Client implements CommandInterface
 
     public function multi()
     {
-        // TODO: Implement multi() method.
         $command = Enum::MULTI;
 
         return $this->pipe(Builder::build($command));
@@ -362,7 +327,6 @@ class Client implements CommandInterface
 
     public function pExpire($key, $milliseconds)
     {
-        // TODO: Implement pExpire() method.
         $command = Enum::PEXPIRE;
         $args = [$key, $milliseconds];
 
@@ -371,7 +335,6 @@ class Client implements CommandInterface
 
     public function pExpireAt($key, $milliseconds)
     {
-        // TODO: Implement pExpireAt() method.
         $command = Enum::PEXPIREAT;
         $args = [$key, $milliseconds];
 
@@ -380,7 +343,6 @@ class Client implements CommandInterface
 
     public function sync()
     {
-        // TODO: Implement sync() method.
         $command = Enum::SYNC;
 
         return $this->pipe(Builder::build($command));
@@ -388,7 +350,6 @@ class Client implements CommandInterface
 
     public function time()
     {
-        // TODO: Implement time() method.
         $command = Enum::TIME;
 
         return $this->pipe(Builder::build($command));
@@ -405,7 +366,6 @@ class Client implements CommandInterface
 
     public function ttl($key)
     {
-        // TODO: Implement ttl() method.
         $command = Enum::TTL;
         $args = [$key];
 
@@ -458,10 +418,10 @@ class Client implements CommandInterface
 
     public function select($index)
     {
-        // TODO: Implement select() method.
         $command = Enum::SELECT;
+        $args = [$index];
 
-        return $this;
+        return $this->pipe(Builder::build($command, $args));
     }
 
     public function set($key, $value, array $options = [])
@@ -475,7 +435,6 @@ class Client implements CommandInterface
 
     public function setBit($key, $offset, $value)
     {
-        // TODO: Implement setBit() method.
         $command = Enum::SETBIT;
         $args = [$key, $offset, $value];
 
@@ -500,7 +459,6 @@ class Client implements CommandInterface
 
     public function randomKey()
     {
-        // TODO: Implement randomKey() method.
         $command = Enum::RANDOMKEY;
 
         return $this->pipe(Builder::build($command));
@@ -508,7 +466,6 @@ class Client implements CommandInterface
 
     public function readOnly()
     {
-        // TODO: Implement readOnly() method.
         $command = Enum::READONLY;
 
         return $this->pipe(Builder::build($command));
@@ -532,7 +489,6 @@ class Client implements CommandInterface
 
     public function restore($key, $ttl, $value)
     {
-        // TODO: Implement restore() method.
         $command = Enum::RESTORE;
         $args = [$key, $ttl, $value];
 
@@ -550,8 +506,11 @@ class Client implements CommandInterface
     public function quit()
     {
         $command = Enum::QUIT;
+        $that = $this;
 
-        return $this->pipe(Builder::build($command));
+        return $this->pipe(Builder::build($command))->then(function ($_) use ($that) {
+            $that->dispatcher->emit('disconnect');
+        });
     }
 
     public function setRange($key, $offset, $value)
@@ -1145,7 +1104,6 @@ class Client implements CommandInterface
 
     public function flushDb()
     {
-        // TODO: Implement flushDb() method.
         $command = Enum::FLUSHDB;
 
         return $this->pipe(Builder::build($command));
@@ -1180,19 +1138,22 @@ class Client implements CommandInterface
         });
     }
 
-    public function zAdd($key, array $options = [])
+    public function zAdd($key, array $options = [], array $scoreMembers = [])
     {
-        // TODO: Implement zAdd() method.
         $command = Enum::ZADD;
-        $args = [$key];
-        $args = array_merge($args, $options);
+        $args = array_merge([$key], $options);
+        if (!empty($scoreMembers)) {
+            foreach ($scoreMembers as $score => $member) {
+                $args[] = (float) $score;
+                $args[] = $member;
+            }
+        }
 
         return $this->pipe(Builder::build($command, $args));
     }
 
     public function zCard($key)
     {
-        // TODO: Implement zCard() method.
         $command = Enum::ZCARD;
         $args = [$key];
 
@@ -1201,7 +1162,6 @@ class Client implements CommandInterface
 
     public function zCount($key, $min, $max)
     {
-        // TODO: Implement zCount() method.
         $command = Enum::ZCOUNT;
         $args = [$key, $min, $max];
 
@@ -1210,7 +1170,6 @@ class Client implements CommandInterface
 
     public function zIncrBy($key, $increment, $member)
     {
-        // TODO: Implement zIncrBy() method.
         $command = Enum::ZINCRBY;
         $args = [$key, $increment, $member];
 
@@ -1228,26 +1187,35 @@ class Client implements CommandInterface
 
     public function zLexCount($key, $min, $max)
     {
-        // TODO: Implement zLexCount() method.
         $command = Enum::ZLEXCOUNT;
         $args = [$key, $min, $max];
 
         return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRange($key, $star, $stop, array $options = [])
+    public function zRange($key, $star = 0, $stop = -1, $withScores = false)
     {
-        // TODO: Implement zRange() method.
         $command = Enum::ZRANGE;
-        $args = [$key, $star,$stop];
-        $args = array_merge($args, $options);
+        $args = [$key, $star, $stop];
+        if ($withScores) {
+            $args[] = 'WITHSCORES';
+
+            return $this->pipe(Builder::build($command, $args))->then(function ($value) {
+                $len = count($value);
+                $ret = [];
+                for ($i=0; $i<$len; $i+=2) {
+                    $ret[$value[$i]] = $value[$i+1];
+                }
+
+                return $ret;
+            });
+        }
 
         return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRangeByLex($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByLex() method.
         $command = Enum::ZRANGEBYLEX;
         $args = [$key, $min, $max];
         $args = array_merge($args,$options);
@@ -1257,7 +1225,6 @@ class Client implements CommandInterface
 
     public function zRevRangeByLex($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByLex() method.
         $command = Enum::ZREVRANGEBYLEX;
         $args = [$key, $max,$min];
         $args = array_merge($args,$options);
@@ -1267,7 +1234,6 @@ class Client implements CommandInterface
 
     public function zRangeByScore($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByScore() method.
         $command = Enum::ZRANGEBYSCORE;
         $args = [$key, $min,$max];
         $args = array_merge($args, $options);
@@ -1277,7 +1243,6 @@ class Client implements CommandInterface
 
     public function zRank($key, $member)
     {
-        // TODO: Implement zRank() method.
         $command = Enum::ZRANK;
         $args = [$key,$member];
 
@@ -1286,44 +1251,41 @@ class Client implements CommandInterface
 
     public function zRem($key, ...$members)
     {
-        // TODO: Implement zRem() method.
         $command = Enum::ZREM;
-        $args = [$key];
-        $args = array_merge($args, $members);
+        $args = array_merge([$key], $members);
 
         return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRemRangeByLex($key, $min, $max)
+    public function zRemRangeByLex($key, $min, $max, $options = [])
     {
-        // TODO: Implement zRemRangeByLex() method.
         $command = Enum::ZREMRANGEBYLEX;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
 
         return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRemRangeByRank($key, $start, $stop)
     {
-        // TODO: Implement zRemRangeByRank() method.
         $command = Enum::ZREMRANGEBYRANK;
         $args = [$key, $start,$stop];
 
         return $this->pipe(Builder::build($command, $args));
     }
 
-    public function zRemRangeByScore($key, $min, $max)
+    public function zRemRangeByScore($key, $min, $max, $options = [])
     {
-        // TODO: Implement zRemRangeByScore() method.
         $command = Enum::ZREMRANGEBYSCORE;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
+        var_export($args);
 
         return $this->pipe(Builder::build($command, $args));
     }
 
     public function zRevRange($key, $start, $stop, array $options = [])
     {
-        // TODO: Implement zRevRange() method.
         $command = Enum::ZREVRANGE;
         $args = [$key, $start, $stop];
         $args = array_merge($args, $options);
@@ -1333,7 +1295,6 @@ class Client implements CommandInterface
 
     public function zRevRangeByScore($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByScore() method.
         $command = Enum::ZREVRANGEBYSCORE;
         $args = [$key,$max,$min];
         $args = array_merge($args, $options);
@@ -1343,7 +1304,6 @@ class Client implements CommandInterface
 
     public function zRevRank($key, $member)
     {
-        // TODO: Implement zRevRank() method.
         $command = Enum::ZREVRANK;
         $args = [$key,$member];
 
@@ -1352,7 +1312,6 @@ class Client implements CommandInterface
 
     public function zScore($key, $member)
     {
-        // TODO: Implement zScore() method.
         $command = Enum::ZSCORE;
         $args = [$key,$member];
 

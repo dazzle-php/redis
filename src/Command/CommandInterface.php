@@ -1141,10 +1141,10 @@ interface CommandInterface
      * @param $key
      * @param $star
      * @param $stop
-     * @param array $options
+     * @param bool $withScores
      * @return mixed
      */
-    public function zRange($key,$star,$stop,array $options = []);
+    public function zRange($key,$star,$stop,$withScores);
 
     /**
      * @doc https://redis.io/commands/zrangebylex

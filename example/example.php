@@ -37,7 +37,6 @@ $client->zRemRangeByScore('k',0,1)->then(function ($response) {
     echo $response.PHP_EOL;
 });
 
-
 $client->quit();
 
 $loop->onStart(function () use ($client, $loop) {
