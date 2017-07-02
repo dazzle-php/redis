@@ -1,32 +1,50 @@
 {
-    "name": "kraken-php/redis",
-    "description": "Kraken Framework Redis Component.",
+    "name": "dazzle-php/redis",
+    "description": "Dazzle Asynchronous Redis Driver.",
     "keywords": [
-        "kraken", "kraken-php", "async-redis"
+        "dazzle", "dazzle-php", "async", "async-redis", "redis", "redis-client", "cache", "queue", "client"
     ],
     "license": "MIT",
-    "homepage": "http://kraken-php.com",
     "support": {
-        "issues": "https://github.com/kraken-php/framework/issues",
-        "source": "https://github.com/kraken-php/framework"
+        "issues": "https://github.com/dazzle-php/redis/issues",
+        "source": "https://github.com/dazzle-php/redis"
     },
-    "authors": [{
-        "name": "Kamil Jamroz"
-    }],
+    "authors": [
+        {
+            "name":     "Kamil Jamroz",
+            "homepage": "https://github.com/khelle"
+        },
+        {
+            "name":     "Hidehalo",
+            "homepage": "https://github.com/hidehalo"
+        },
+        {
+            "name":     "The contributors",
+            "homepage": "http://github.com/dazzle-php/channel/contributors"
+        }
+    ],
     "require": {
-        "php": ">=5.5.9",
-        "kraken-php/promise": "0.3.*",
-        "kraken-php/ipc": "0.3.*",
+        "php": ">=5.6.7",
+        "dazzle-php/event": "0.5.*",
+        "dazzle-php/loop": "0.5.*",
+        "dazzle-php/promise": "0.5.*",
+        "dazzle-php/socket": "0.5.*",
+        "dazzle-php/throwable": "0.5.*",
+        "dazzle-php/util": "0.5.*",
         "clue/redis-protocol": "0.3.*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": ">=4.8.0 <5.4.0"
     },
     "autoload": {
         "psr-4": {
-            "Kraken\\Redis\\": "src"
+            "Dazzle\\Redis\\": "src/Redis",
+            "Dazzle\\Redis\\Test\\": "test"
         }
     },
     "extra": {
         "branch-alias": {
-            "dev-master": "0.4-dev"
+            "dev-master": "0.5-dev"
         }
     },
     "minimum-stability": "dev",

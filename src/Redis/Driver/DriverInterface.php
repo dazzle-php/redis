@@ -1,12 +1,10 @@
 <?php
 
-namespace Kraken\Redis\Protocol;
+namespace Dazzle\Redis\Driver;
 
 use Clue\Redis\Protocol\Model\Request;
 
-interface RespProtocol
+interface DriverInterface
 {
     public function commands(Request $request);
-
-    public function replies($data);
 }

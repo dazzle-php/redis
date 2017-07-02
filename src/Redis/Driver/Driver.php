@@ -1,32 +1,39 @@
 <?php
-namespace Kraken\Redis\Protocol;
+namespace Dazzle\Redis\Driver;
 
+use Clue\Redis\Protocol\Model\ModelInterface;
 use Clue\Redis\Protocol\Model\Request;
 use Clue\Redis\Protocol\Parser\RequestParser;
 use Clue\Redis\Protocol\Parser\ResponseParser;
 use Clue\Redis\Protocol\Serializer\RecursiveSerializer;
 
-class Resp implements RespProtocol
+class Driver implements DriverInterface
 {
     /**
      * @var RequestParser
      */
-    private $requestParser;
+    protected $requestParser;
+
     /**
      * @var ResponseParser
      */
-    private $responseParser;
+    protected $responseParser;
+
     /**
      * @var RecursiveSerializer
      */
-    private $serializer;
+    protected $serializer;
 
+    /**
+     *
+     */
     public function __construct()
     {
         $this->requestParser = new RequestParser();
         $this->responseParser = new ResponseParser();
         $this->serializer = new RecursiveSerializer();
     }
+
     /**
      * @inheritDoc
      */
@@ -37,15 +44,7 @@ class Resp implements RespProtocol
             $request->getArgs()
         );
     }
-    /**
-     * @inheritDoc
-     */
-    public function replies($data)
-    {
-        $model = $this->serializer->createReplyModel($data);
 
-        return $model;
-    }
     /**
      * @return RecursiveSerializer
      */
@@ -53,6 +52,7 @@ class Resp implements RespProtocol
     {
         return $this->serializer;
     }
+
     /**
      * @return RequestParser
      */
@@ -60,6 +60,7 @@ class Resp implements RespProtocol
     {
         return $this->requestParser;
     }
+
     /**
      * @return ResponseParser
      */
@@ -67,13 +68,16 @@ class Resp implements RespProtocol
     {
         return $this->responseParser;
     }
+
     /**
      * @param $data
+     * @return ModelInterface[]
      */
     public function parseResponse($data)
     {
         return $this->responseParser->pushIncoming($data);
     }
+
     /**
      * @param $data
      * @return string

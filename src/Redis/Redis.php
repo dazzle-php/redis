@@ -1,39 +1,65 @@
 <?php
 
-namespace Kraken\Redis;
+namespace Dazzle\Redis;
 
-use RuntimeException;
-use Kraken\Promise\Deferred;
-use Kraken\Redis\Command\Enum;
-use Kraken\Redis\Command\Builder;
-use Kraken\Loop\LoopInterface;
-use Clue\Redis\Protocol\Model\Request;
-use Kraken\Redis\Command\CommandInterface;
+use Dazzle\Redis\Command\Enum;
+use Dazzle\Redis\Driver\Request;
+use Dazzle\Redis\Command\Builder;
+use Dazzle\Loop\LoopInterface;
+use Dazzle\Promise\PromiseInterface;
+use Dazzle\Promise\Deferred;
+use Dazzle\Throwable\Exception\RuntimeException;
+use Error;
 
-class Client implements CommandInterface
+class Redis
 {
     /**
-     * @overwrite
-     * @param string $uri
+     * @var string
+     */
+    protected $endpoint;
+
+    /**
+     * @param string $endpoint
      * @param LoopInterface $loop
      */
-    public function __construct($uri, LoopInterface $loop)
+    public function __construct($endpoint, LoopInterface $loop)
     {
-        $this->uri = $uri;
+        $this->endpoint = $endpoint;
+        $this->loop = $loop;
         $this->dispatcher = new Dispatcher($loop);
+        $this->driver = $this->dispatcher->getDriver();
     }
 
+    /**
+     *
+     */
+    public function __destruct()
+    {
+
+    }
+
+    /**
+     * Pipe Redis request.
+     *
+     * @param Request $command
+     * @return PromiseInterface
+     */
     private function pipe(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
-        if ($this->dispatcher->ending) {
+        if ($this->dispatcher->isEnding())
+        {
             $request->reject(new RuntimeException('Connection closed'));
-        } else {
-            $payload = $this->dispatcher->protocol->commands($command);
+        } 
+        else 
+        {
+            $payload = $this->driver->commands($command);
+
             $this->dispatcher->on('request', function () use ($payload) {
                 $this->dispatcher->handleRequest($payload);
             });
+
             $this->dispatcher->appendRequest($request);
         }
 
@@ -42,12 +68,9 @@ class Client implements CommandInterface
 
     public function connect($config = [])
     {
-        $this->dispatcher->watch($this->uri);
+        $this->dispatcher->watch($this->endpoint);
     }
 
-    /**
-     * Commands ...
-     */
     public function auth($password)
     {
         $command = Enum::AUTH;
@@ -1279,7 +1302,6 @@ class Client implements CommandInterface
         $command = Enum::ZREMRANGEBYSCORE;
         $args = [$key, $min, $max];
         $args = array_merge($args, $options);
-        var_export($args);
 
         return $this->pipe(Builder::build($command, $args));
     }

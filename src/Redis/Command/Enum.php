@@ -1,9 +1,10 @@
 <?php
-namespace Kraken\Redis\Command;
+namespace Dazzle\Redis\Command;
 
-use Kraken\Util\Enum\EnumTrait;
+use Dazzle\Util\Enum\EnumInterface;
+use Dazzle\Util\Enum\EnumTrait;
 
-class Enum
+class Enum implements EnumInterface
 {
     use EnumTrait;
 

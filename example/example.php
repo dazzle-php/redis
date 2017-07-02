@@ -1,55 +1,62 @@
 <?php
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Kraken\Loop\Loop;
-use Kraken\Redis\Client;
-use Kraken\Loop\Model\SelectLoop;
+use Dazzle\Loop\Model\SelectLoop;
+use Dazzle\Loop\Loop;
+use Dazzle\Redis\Redis;
 
 $loop = new Loop(new SelectLoop());
 
-$client = new Client('192.168.99.100:32768', $loop);
+// $redis = new Redis('tcp://127.0.0.1:6379', $loop);
 
 $ret = [];
 
-$client->select(0);
+$loop = new Loop(new SelectLoop());
 
-$client->flushDb();
+$redis = new Redis('192.168.99.100:32768', $loop);
 
-$client->set('test','Hello Kraken Redis!');
+$ret = [];
 
-$client->exists('test')->then(function ($response) {
+$redis->select(0);
+
+$redis->flushDb();
+
+$redis->set('test','Hello Kraken Redis!');
+
+$redis->exists('test')->then(function ($response) {
     echo $response.PHP_EOL;
 });
 
-$client->info(['cpu'])->then(function ($value) {
+$redis->info(['cpu'])->then(function ($value) {
     global $ret;
     $ret[] = $value;
 });
 
-$client->zAdd('k', [], ['0.002' => 'h','0.004' => 'l']);
+$redis->zAdd('k', [], ['0.002' => 'h','0.004' => 'l']);
 
-$client->zRange('k', 0, -1, true)->then(function ($response) {
+$redis->zRange('k', 0, -1, true)->then(function ($response) {
     var_export($response);
     echo PHP_EOL;
 });
 
-$client->zRemRangeByScore('k',0,1)->then(function ($response) {
+$redis->zRemRangeByScore('k',0,1)->then(function ($response) {
     echo $response.PHP_EOL;
 });
 
-$client->quit();
+$redis->quit();
 
-$loop->onStart(function () use ($client, $loop) {
+$loop->onStart(function () use ($redis, $loop) {
 
-    $client->dispatcher->on('error', function(\Exception $e) {
+    $redis->dispatcher->on('error', function(\Exception $e) {
         echo $e->getMessage().PHP_EOL;
     });
 
-    $client->dispatcher->on('close', function () use ($loop){
+    $redis->dispatcher->on('close', function () use ($loop){
         $loop->stop();
     });
 
-    $client->connect();
+    $redis->connect();
 });
 
 $loop->start();

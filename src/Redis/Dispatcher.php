@@ -1,64 +1,149 @@
 <?php
 
-namespace Kraken\Redis;
+namespace Dazzle\Redis;
 
-use Kraken\Loop\Loop;
-use Kraken\Loop\LoopInterface;
-use Kraken\Promise\Deferred;
-use Kraken\Ipc\Socket\Socket;
-use Kraken\Redis\Protocol\Resp;
-use Kraken\Event\AsyncEventEmitter;
+use Dazzle\Socket\Socket;
+use Dazzle\Promise\Deferred;
+use Dazzle\Loop\LoopInterface;
+use Dazzle\Redis\Driver\Driver;
+use Dazzle\Socket\SocketInterface;
+use Dazzle\Event\AsyncEventEmitter;
+use Dazzle\Redis\Driver\DriverInterface;
+use Dazzle\Throwable\Exception\Runtime\ExecutionException;
+use Dazzle\Throwable\Exception\Runtime\UnderflowException;
+use Error;
+use Exception;
+
 use Clue\Redis\Protocol\Model\ErrorReply;
 use Clue\Redis\Protocol\Model\ModelInterface;
-use RuntimeException;
-use UnderflowException;
 use Clue\Redis\Protocol\Parser\ParserException;
 
 class Dispatcher extends AsyncEventEmitter
 {
-
     /**
-     * @var Socket
+     * Stream
+     * @var SocketInterface
      */
     private $stream;
+
     /**
-     * @var Resp
+     * Deferred requests
+     * @var array
      */
+    private $reqs;
 
-    protected $requests;
+    /**
+     * Driver of RESP protocol
+     * @var DriverInterface
+     */
+    private $protocol;
 
-    public $protocol;
+    /**
+     * Flag of ending
+     * @var bool
+     */
+    private $ending;
 
-    public $ending;
+    /**
+     * Flag of closed
+     * @var bool
+     */
+    private $closed;
 
-    public $closed;
-
+    /**
+     * Constructor
+     * @param LoopInterface $loop
+     */
     public function __construct(LoopInterface $loop)
     {
         parent::__construct($loop);
-        $this->requests = [];
+        $this->reqs = [];
         $this->ending = false;
         $this->closed = false;
-        $this->protocol = new Resp();
+        $this->protocol = new Driver();
         $this->on('connect', [$this, 'handleConnect']);
         $this->on('response',[$this, 'handleResponse']);
         $this->on('disconnect',[$this, 'handleDisconnect']);
         $this->on('close', [$this, 'handleClose']);
     }
 
-    public function appendRequest($request)
+    /**
+     * Destructor
+     */
+    public function __destruct()
     {
-        $this->requests[] = $request;
+        if ($this->ending != true)
+        {
+            $this->handleDisconnect();        
+        }
+        else 
+        {
+            $this->handleClose();        
+        }
     }
 
-    public function watch($uri)
+     /**
+     * Create socket client with connection to Redis database.
+     *
+     * @param string $endpoint
+     * @return SocketInterface
+     * @throws ExecutionException
+     */
+    protected function createClient($endpoint)
+    {
+        $ex = null;
+
+        try
+        {
+            return new Socket($endpoint, $this->loop);
+        }
+        catch (Error $ex)
+        {}
+        catch (Exception $ex)
+        {}
+
+        throw new ExecutionException('Redis connection socket could not be created!', 0, $ex);
+    }
+
+    /**
+     * Get RESP Driver
+     * @return DriverInterface
+     */
+    public function getDriver()
+    {
+        return $this->protocol;
+    }
+
+    /**
+     * Get dispatcher ending flag
+     * @return bool
+     */
+    public function isEnding()
+    {
+        return $this->ending? true: false;
+    }
+
+    /**
+     * Append request
+     * @param $req
+     */
+    public function appendRequest($req)
+    {
+        $this->reqs[] = $req;
+    }
+
+    /**
+     * Watch and dispatch streaming
+     * @param $endpoint
+     */
+    public function watch($endpoint)
     {
         if ($this->stream !== null) {
             return;
         }
 
         try {
-            $this->stream = new Socket($uri, $this->getLoop());
+            $this->stream = $this->createClient($endpoint);
         } catch (\Exception $e) {
             $this->emit('error', [$e]);
         }
@@ -118,19 +203,19 @@ class Dispatcher extends AsyncEventEmitter
      */
     public function handleResponse(ModelInterface $message)
     {
-        if (!$this->requests) {
+        if (!$this->reqs) {
             throw new UnderflowException('Unexpected reply received, no matching request found');
         }
-        /* @var Deferred $request */
-        $request = array_shift($this->requests);
+        /* @var Deferred $req */
+        $req = array_shift($this->reqs);
 
         if ($message instanceof ErrorReply) {
-            $request->reject($message);
+            $req->reject($message);
         } else {
-            $request->resolve($message->getValueNative());
+            $req->resolve($message->getValueNative());
         }
 
-        if (count($this->requests) <= 0) {
+        if (count($this->reqs) <= 0) {
             $this->emit('disconnect');
         }
     }
@@ -142,10 +227,10 @@ class Dispatcher extends AsyncEventEmitter
     {
         $this->ending = true;
         // reject all remaining requests in the queue
-        while($this->requests) {
-            $request = array_shift($this->requests);
-            /* @var $request Deferred */
-            $request->reject(new RuntimeException('Connection closing'));
+        while($this->reqs) {
+            $req = array_shift($this->reqs);
+            /* @var $req Deferred */
+            $req->reject(new RuntimeException('Connection closing'));
         }
         $this->stream->close();
         $this->emit('close');
