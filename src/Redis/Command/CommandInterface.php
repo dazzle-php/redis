@@ -62,7 +62,7 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function bitOp($operation,$dstKey,$srcKey, ...$keys);
+    public function bitOp($operation, $dstKey, $srcKey, ...$keys);
 
     /**
      * @doc https://redis.io/commands/bitpos
@@ -73,7 +73,7 @@ interface CommandInterface
      * @param int $end
      * @return mixed
      */
-    public function bitPos($key,$bit,$start=0,$end=0);
+    public function bitPos($key, $bit, $start=0, $end=0);
 
     /**
      * @doc https://redis.io/commands/blpop
@@ -91,7 +91,7 @@ interface CommandInterface
      * @param $timeout
      * @return mixed
      */
-    public function brPop(array $keys,$timeout);
+    public function brPop(array $keys, $timeout);
 
     /**
      * @doc https://redis.io/commands/brpoplpush
@@ -101,7 +101,7 @@ interface CommandInterface
      * @param $timeout
      * @return mixed
      */
-    public function brPopLPush($src,$dst,$timeout);
+    public function brPopLPush($src, $dst, $timeout);
 
     /**
      * @doc https://redis.io/commands/decr
@@ -118,7 +118,7 @@ interface CommandInterface
      * @param $decrement
      * @return mixed
      */
-    public function decrBy($key,$decrement);
+    public function decrBy($key, $decrement);
 
     /**
      * @doc https://redis.io/commands/del
@@ -127,7 +127,7 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function del($key,...$keys);
+    public function del($key, ...$keys);
 
     /**
      * @doc https://redis.io/commands/discard
@@ -160,7 +160,7 @@ interface CommandInterface
      * @param $seconds
      * @return mixed
      */
-    public function expire($key,$seconds);
+    public function expire($key, $seconds);
 
     /**
      * @doc https://redis.io/commands/expireat
@@ -169,7 +169,7 @@ interface CommandInterface
      * @param $timestamp
      * @return mixed
      */
-    public function expireAt($key,$timestamp);
+    public function expireAt($key, $timestamp);
 
     /**
      * @doc https://redis.io/commands/get
@@ -186,7 +186,7 @@ interface CommandInterface
      * @param $offset
      * @return mixed
      */
-    public function getBit($key,$offset);
+    public function getBit($key, $offset);
 
     /**
      * @doc https://redis.io/commands/getrange
@@ -196,7 +196,7 @@ interface CommandInterface
      * @param $end
      * @return mixed
      */
-    public function getRange($key,$start,$end);
+    public function getRange($key, $start, $end);
 
     /**
      * @doc https://redis.io/commands/getset
@@ -205,7 +205,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function getSet($key,$value);
+    public function getSet($key, $value);
 
     /**
      * @doc https://redis.io/commands/hdel
@@ -214,7 +214,7 @@ interface CommandInterface
      * @param ...$fields
      * @return mixed
      */
-    public function hDel($key,...$fields);
+    public function hDel($key, ...$fields);
 
     /**
      * @doc https://redis.io/commands/hexists
@@ -223,7 +223,7 @@ interface CommandInterface
      * @param $field
      * @return mixed
      */
-    public function hExists($key,$field);
+    public function hExists($key, $field);
 
     /**
      * @doc https://redis.io/commands/hget
@@ -232,7 +232,7 @@ interface CommandInterface
      * @param $field
      * @return mixed
      */
-    public function hGet($key,$field);
+    public function hGet($key, $field);
 
     /**
      * @doc https://redis.io/commands/hgetall
@@ -250,7 +250,7 @@ interface CommandInterface
      * @param $incrment
      * @return mixed
      */
-    public function hIncrBy($key,$field,$incrment);
+    public function hIncrBy($key, $field, $incrment);
 
     /**
      * @doc https://redis.io/commands/hincrbyfloat
@@ -260,7 +260,7 @@ interface CommandInterface
      * @param $increment
      * @return mixed
      */
-    public function hIncrByFloat($key,$field,$increment);
+    public function hIncrByFloat($key, $field, $increment);
 
     /**
      * @doc https://redis.io/commands/hkeys
@@ -285,7 +285,7 @@ interface CommandInterface
      * @param ...$fields
      * @return mixed
      */
-    public function hMGet($key,...$fields);
+    public function hMGet($key, ...$fields);
 
     /**
      * @doc https://redis.io/commands/hmset
@@ -294,7 +294,7 @@ interface CommandInterface
      * @param array $fvMap
      * @return mixed
      */
-    public function hMSet($key,array $fvMap);
+    public function hMSet($key, array $fvMap);
 
     /**
      * @doc https://redis.io/commands/hset
@@ -304,7 +304,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function hSet($key,$field,$value);
+    public function hSet($key, $field, $value);
 
     /**
      * @doc https://redis.io/commands/hsetnx
@@ -314,7 +314,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function hSetNx($key,$filed,$value);
+    public function hSetNx($key, $filed, $value);
 
     /**
      * @doc https://redis.io/commands/hstrlen
@@ -323,7 +323,7 @@ interface CommandInterface
      * @param $field
      * @return mixed
      */
-    public function hStrLen($key,$field);
+    public function hStrLen($key, $field);
 
     /**
      * @doc https://redis.io/commands/hvals
@@ -348,7 +348,7 @@ interface CommandInterface
      * @param $increment
      * @return mixed
      */
-    public function incrBy($key,$increment);
+    public function incrBy($key, $increment);
 
     /**
      * @doc https://redis.io/commands/incrbyfloat
@@ -357,7 +357,7 @@ interface CommandInterface
      * @param $increment
      * @return mixed
      */
-    public function incrByFloat($key,$increment);
+    public function incrByFloat($key, $increment);
 
     /**
      * @doc https://redis.io/commands/multi
@@ -381,7 +381,7 @@ interface CommandInterface
      * @param $milliseconds
      * @return mixed
      */
-    public function pExpire($key,$milliseconds);
+    public function pExpire($key, $milliseconds);
 
     /**
      * @doc https://redis.io/commands/pexpireat
@@ -390,7 +390,7 @@ interface CommandInterface
      * @param $milliseconds
      * @return mixed
      */
-    public function pExpireAt($key,$milliseconds);
+    public function pExpireAt($key, $milliseconds);
 
     /**
      * @doc https://redis.io/commands/sync
@@ -454,7 +454,7 @@ interface CommandInterface
      * @param $timeout
      * @return mixed
      */
-    public function wait($numSlaves,$timeout);
+    public function wait($numSlaves, $timeout);
 
     /**
      * @doc https://redis.io/commands/watch
@@ -481,7 +481,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function set($key,$value,array $options);
+    public function set($key, $value, array $options = []);
 
     /**
      * @doc https://redis.io/commands/setbit
@@ -491,7 +491,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function setBit($key,$offset,$value);
+    public function setBit($key, $offset, $value);
 
     /**
      * @doc https://redis.io/commands/setex
@@ -501,7 +501,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function setEx($key,$seconds,$value);
+    public function setEx($key, $seconds, $value);
 
     /**
      * @doc https://redis.io/commands/setnx
@@ -510,7 +510,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function setNx($key,$value);
+    public function setNx($key, $value);
 
     /**
      * @doc https://redis.io/commands/randomkey
@@ -540,7 +540,7 @@ interface CommandInterface
      * @param $newKey
      * @return mixed
      */
-    public function rename($key,$newKey);
+    public function rename($key, $newKey);
 
     /**
      * @doc https://redis.io/commands/renamenx
@@ -549,7 +549,7 @@ interface CommandInterface
      * @param $newKey
      * @return mixed
      */
-    public function renameNx($key,$newKey);
+    public function renameNx($key, $newKey);
 
     /**
      * @doc https://redis.io/commands/restore
@@ -559,7 +559,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function restore($key,$ttl,$value);
+    public function restore($key, $ttl, $value);
 
     /**
      * @doc https://redis.io/commands/ping
@@ -584,7 +584,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function setRange($key,$offset,$value);
+    public function setRange($key, $offset, $value);
 
     /**
      * @doc https://redis.io/commands/geoadd
@@ -593,7 +593,7 @@ interface CommandInterface
      * @param array $coordinates
      * @return mixed
      */
-    public function geoAdd($key,array $coordinates);
+    public function geoAdd($key, array $coordinates);
 
     /**
      * @doc https://redis.io/commands/geohash
@@ -602,7 +602,7 @@ interface CommandInterface
      * @param ...$members
      * @return mixed
      */
-    public function geoHash($key,...$members);
+    public function geoHash($key, ...$members);
 
     /**
      * @doc https://redis.io/commands/geopos
@@ -611,7 +611,7 @@ interface CommandInterface
      * @param ...$members
      * @return mixed
      */
-    public function geoPos($key,...$members);
+    public function geoPos($key, ...$members);
 
     /**
      * @doc https://redis.io/commands/geodist
@@ -622,7 +622,7 @@ interface CommandInterface
      * @param $unit
      * @return mixed
      */
-    public function geoDist($key,$memberA,$memberB,$unit);
+    public function geoDist($key, $memberA, $memberB, $unit);
 
     /**
      * @doc https://redis.io/commands/georadius
@@ -636,7 +636,7 @@ interface CommandInterface
      * @param $sort
      * @return mixed
      */
-    public function geoRadius($key,$longitude,$latitude,$unit,$command,$count,$sort);
+    public function geoRadius($key, $longitude, $latitude, $unit, $command, $count, $sort);
 
     /**
      * @doc https://redis.io/commands/georadiusbymember
@@ -651,7 +651,7 @@ interface CommandInterface
      * @param $storeDist
      * @return mixed
      */
-    public function geoRadiusByMember($key,$member,$unit,$command,$count,$sort,$store,$storeDist);
+    public function geoRadiusByMember($key, $member, $unit, $command, $count, $sort, $store, $storeDist);
 
     /**
      * @doc https://redis.io/commands/pttl
@@ -669,7 +669,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function pSetEx($key,$milliseconds,$value);
+    public function pSetEx($key, $milliseconds, $value);
 
     /**
      * @doc https://redis.io/commands/psubscribe
@@ -686,7 +686,7 @@ interface CommandInterface
      * @param array $args
      * @return mixed
      */
-    public function pubSub($command,array $args = []);
+    public function pubSub($command, array $args = []);
 
     /**
      * @doc https://redis.io/commands/publish
@@ -695,7 +695,7 @@ interface CommandInterface
      * @param $message
      * @return mixed
      */
-    public function publish($channel,$message);
+    public function publish($channel, $message);
 
     /**
      * @doc https://redis.io/commands/punsubscribe
@@ -720,7 +720,7 @@ interface CommandInterface
      * @param $index
      * @return mixed
      */
-    public function lIndex($key,$index);
+    public function lIndex($key, $index);
 
     /**
      * @doc https://redis.io/commands/linsert
@@ -731,7 +731,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function lInsert($key,$action,$pivot,$value);
+    public function lInsert($key, $action, $pivot, $value);
 
     /**
      * @doc https://redis.io/commands/llen
@@ -756,7 +756,7 @@ interface CommandInterface
      * @param ...$values
      * @return mixed
      */
-    public function lPush($key,...$values);
+    public function lPush($key, ...$values);
 
     /**
      * @doc https://redis.io/commands/lpushx
@@ -765,7 +765,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function lPushX($key,$value);
+    public function lPushX($key, $value);
 
     /**
      * @doc https://redis.io/commands/lrange
@@ -775,7 +775,7 @@ interface CommandInterface
      * @param $stop
      * @return mixed
      */
-    public function lRange($key,$start,$stop);
+    public function lRange($key, $start, $stop);
 
     /**
      * @doc https://redis.io/commands/lrem
@@ -785,7 +785,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function lRem($key,$count,$value);
+    public function lRem($key, $count, $value);
 
     /**
      * @doc https://redis.io/commands/lset
@@ -795,7 +795,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function lSet($key,$index,$value);
+    public function lSet($key, $index, $value);
 
     /**
      * @doc https://redis.io/commands/ltrim
@@ -805,7 +805,7 @@ interface CommandInterface
      * @param $stop
      * @return mixed
      */
-    public function lTrim($key,$start,$stop);
+    public function lTrim($key, $start, $stop);
 
     /**
      * @doc https://redis.io/commands/mget
@@ -814,7 +814,7 @@ interface CommandInterface
      * @param ...$values
      * @return mixed
      */
-    public function mGet($key,...$values);
+    public function mGet($key, ...$values);
 
     /**
      * @doc https://redis.io/commands/mset
@@ -838,7 +838,7 @@ interface CommandInterface
      * @param $db
      * @return mixed
      */
-    public function move($key,$db);
+    public function move($key, $db);
 
     /**
      * @doc https://redis.io/commands/msetnx
@@ -863,7 +863,7 @@ interface CommandInterface
      * @param $dst
      * @return mixed
      */
-    public function rPopLPush($src,$dst);
+    public function rPopLPush($src, $dst);
 
     /**
      * @doc https://redis.io/commands/rpush
@@ -872,7 +872,7 @@ interface CommandInterface
      * @param ...$values
      * @return mixed
      */
-    public function rPush($key,...$values);
+    public function rPush($key, ...$values);
 
     /**
      * @doc https://redis.io/commands/rpushx
@@ -881,7 +881,7 @@ interface CommandInterface
      * @param $value
      * @return mixed
      */
-    public function rPushX($key,$value);
+    public function rPushX($key, $value);
 
     /**
      * @doc https://redis.io/commands/pfadd
@@ -890,7 +890,7 @@ interface CommandInterface
      * @param ...$elements
      * @return mixed
      */
-    public function pFAdd($key,...$elements);
+    public function pFAdd($key, ...$elements);
 
     /**
      * @doc https://redis.io/commands/pfcount
@@ -969,7 +969,7 @@ interface CommandInterface
      * @param $count
      * @return mixed
      */
-    public function clusterGetKeyInSlot($slot,$count);
+    public function clusterGetKeyInSlot($slot, $count);
 
     /**
      * @doc https://redis.io/commands/cluster-info
@@ -993,7 +993,7 @@ interface CommandInterface
      * @param $port
      * @return mixed
      */
-    public function clusterMeet($ip,$port);
+    public function clusterMeet($ip, $port);
 
     /**
      * @doc https://redis.io/commands/cluster-nodes
@@ -1040,7 +1040,7 @@ interface CommandInterface
      * @param $nodeId
      * @return mixed
      */
-    public function clusterSetSlot($command,$nodeId);
+    public function clusterSetSlot($command, $nodeId);
 
     /**
      * @doc https://redis.io/commands/cluster-slaves
@@ -1086,7 +1086,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zAdd($key,array $options = []);
+    public function zAdd($key, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zcard
@@ -1104,7 +1104,7 @@ interface CommandInterface
      * @param $max
      * @return mixed
      */
-    public function zCount($key,$min,$max);
+    public function zCount($key, $min, $max);
 
     /**
      * @doc https://redis.io/commands/zincrby
@@ -1114,7 +1114,7 @@ interface CommandInterface
      * @param $member
      * @return mixed
      */
-    public function zIncrBy($key,$increment,$member);
+    public function zIncrBy($key, $increment, $member);
 
     /**
      * @doc https://redis.io/commands/zinterstore
@@ -1123,7 +1123,7 @@ interface CommandInterface
      * @param $numKeys
      * @return mixed
      */
-    public function zInterStore($dst,$numKeys);
+    public function zInterStore($dst, $numKeys);
 
     /**
      * @doc https://redis.io/commands/zlexcount
@@ -1133,7 +1133,7 @@ interface CommandInterface
      * @param $max
      * @return mixed
      */
-    public function zLexCount($key,$min,$max);
+    public function zLexCount($key, $min, $max);
 
     /**
      * @doc https://redis.io/commands/zrange
@@ -1144,7 +1144,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRange($key,$star,$stop,array $options = []);
+    public function zRange($key, $star, $stop, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrangebylex
@@ -1155,7 +1155,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRangeByLex($key,$min,$max,array $options = []);
+    public function zRangeByLex($key, $min, $max, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrevrangebylex
@@ -1166,7 +1166,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRevRangeByLex($key,$max,$min,array $options = []);
+    public function zRevRangeByLex($key, $max, $min, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrevrangebyscore
@@ -1177,7 +1177,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRangeByScore($key,$min,$max,array $options = []);
+    public function zRangeByScore($key, $min, $max, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrank
@@ -1186,7 +1186,7 @@ interface CommandInterface
      * @param $member
      * @return mixed
      */
-    public function zRank($key,$member);
+    public function zRank($key, $member);
 
     /**
      * @doc https://redis.io/commands/zrem
@@ -1195,7 +1195,7 @@ interface CommandInterface
      * @param ...$members
      * @return mixed
      */
-    public function zRem($key,...$members);
+    public function zRem($key, ...$members);
 
     /**
      * @doc https://redis.io/commands/zremrangebylex
@@ -1205,7 +1205,7 @@ interface CommandInterface
      * @param $max
      * @return mixed
      */
-    public function zRemRangeByLex($key,$min,$max);
+    public function zRemRangeByLex($key, $min, $max);
 
     /**
      * @doc https://redis.io/commands/zremrangebyrank
@@ -1236,7 +1236,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRevRange($key,$start,$stop,array $options = []);
+    public function zRevRange($key, $start, $stop, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrevrangebyscore
@@ -1247,7 +1247,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zRevRangeByScore($key,$max,$min,array $options = []);
+    public function zRevRangeByScore($key, $max, $min, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zrevrank
@@ -1256,7 +1256,7 @@ interface CommandInterface
      * @param $member
      * @return mixed
      */
-    public function zRevRank($key,$member);
+    public function zRevRank($key, $member);
 
     /**
      * @doc https://redis.io/commands/zscore
@@ -1265,7 +1265,7 @@ interface CommandInterface
      * @param $member
      * @return mixed
      */
-    public function zScore($key,$member);
+    public function zScore($key, $member);
 
     /**
      * @doc https://redis.io/commands/zunionstore
@@ -1274,7 +1274,7 @@ interface CommandInterface
      * @param $numKeys
      * @return mixed
      */
-    public function zUnionScore($dst,$numKeys);
+    public function zUnionScore($dst, $numKeys);
 
     /**
      * @doc https://redis.io/commands/scan
@@ -1283,7 +1283,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function scan($cursor,array $options = []);
+    public function scan($cursor, array $options = []);
 
     /**
      * @doc https://redis.io/commands/sscan
@@ -1293,7 +1293,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function sScan($key,$cursor,array $options = []);
+    public function sScan($key, $cursor, array $options = []);
 
     /**
      * @doc https://redis.io/commands/hscan
@@ -1303,7 +1303,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function hScan($key,$cursor,array $options = []);
+    public function hScan($key, $cursor, array $options = []);
 
     /**
      * @doc https://redis.io/commands/zscan
@@ -1313,7 +1313,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function zScan($key,$cursor,array $options = []);
+    public function zScan($key, $cursor, array $options = []);
 
     /**
      * @doc https://redis.io/commands/sinter
@@ -1330,7 +1330,7 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function sInterStore($dst,...$keys);
+    public function sInterStore($dst, ...$keys);
 
     /**
      * @doc https://redis.io/commands/sismember
@@ -1339,7 +1339,7 @@ interface CommandInterface
      * @param $member
      * @return mixed
      */
-    public function sIsMember($key,$member);
+    public function sIsMember($key, $member);
 
     /**
      * @doc https://redis.io/commands/slaveof
@@ -1348,7 +1348,7 @@ interface CommandInterface
      * @param $port
      * @return mixed
      */
-    public function slaveOf($host,$port);
+    public function slaveOf($host, $port);
 
     /**
      * @doc https://redis.io/commands/slowlog
@@ -1357,7 +1357,7 @@ interface CommandInterface
      * @param array $args
      * @return mixed
      */
-    public function sLowLog($command,array $args=[]);
+    public function sLowLog($command, array $args=[]);
 
     /**
      * @doc https://redis.io/commands/smembers
@@ -1375,7 +1375,7 @@ interface CommandInterface
      * @param $members
      * @return mixed
      */
-    public function sMove($src,$dst,$members);
+    public function sMove($src, $dst, $members);
 
     /**
      * @doc https://redis.io/commands/sort
@@ -1384,7 +1384,7 @@ interface CommandInterface
      * @param array $options
      * @return mixed
      */
-    public function sort($key,array $options = []);
+    public function sort($key, array $options = []);
 
     /**
      * @doc https://redis.io/commands/spop
@@ -1393,7 +1393,7 @@ interface CommandInterface
      * @param $count
      * @return mixed
      */
-    public function sPop($key,$count);
+    public function sPop($key, $count);
 
     /**
      * @doc https://redis.io/commands/srandmember
@@ -1402,7 +1402,7 @@ interface CommandInterface
      * @param $count
      * @return mixed
      */
-    public function sRandMember($key,$count);
+    public function sRandMember($key, $count);
 
     /**
      * @doc https://redis.io/commands/srem
@@ -1411,7 +1411,7 @@ interface CommandInterface
      * @param ...$members
      * @return mixed
      */
-    public function sRem($key,...$members);
+    public function sRem($key, ...$members);
 
     /**
      * @doc https://redis.io/commands/strlen
@@ -1444,7 +1444,7 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function sUnionStore($dst,...$keys);
+    public function sUnionStore($dst, ...$keys);
 
     /**
      * @doc https://redis.io/commands/swapdb
@@ -1454,7 +1454,7 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function sWapBb($opt,$dst,...$keys);
+    public function sWapBb($opt, $dst, ...$keys);
 
     /**
      * @doc https://redis.io/commands/sadd
@@ -1463,7 +1463,7 @@ interface CommandInterface
      * @param ...$members
      * @return mixed
      */
-    public function sAdd($key,...$members);
+    public function sAdd($key, ...$members);
 
     /**
      * @doc https://redis.io/commands/save
@@ -1495,5 +1495,5 @@ interface CommandInterface
      * @param ...$keys
      * @return mixed
      */
-    public function sDiffStore($dst,...$keys);
+    public function sDiffStore($dst, ...$keys);
 }
