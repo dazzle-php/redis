@@ -8,6 +8,13 @@ php:
   - 7.0
   - 7.1
 
+services:
+  - redis-server
+
+env:
+  global:
+    - TEST_DB_REDIS_ENDPOINT="tcp://127.0.0.1:6379"
+
 before_install:
   - export PHP_MAJOR="$(echo $TRAVIS_PHP_VERSION | cut -d '.' -f 1,2)"
 
