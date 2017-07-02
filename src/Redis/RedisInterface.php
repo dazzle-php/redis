@@ -2,15 +2,16 @@
 
 namespace Dazzle\Redis;
 
-use Dazzle\Redis\Command\CommandInterface;
 use Dazzle\Event\EventEmitterInterface;
+use Dazzle\Loop\LoopAwareInterface;
+use Dazzle\Redis\Command\CommandInterface;
 
 /**
  * @event start : callable(object)
  * @event stop  : callable(object)
  * @event error : callable(object, Error|Exception)
  */
-interface RedisInterface extends EventEmitterInterface, CommandInterface
+interface RedisInterface extends CommandInterface, EventEmitterInterface, LoopAwareInterface
 {
     /**
      * Check if Redis client has been started.

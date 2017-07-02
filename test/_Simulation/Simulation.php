@@ -57,6 +57,11 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
     private $stopFlags;
 
     /**
+     * @var array
+     */
+    private $params;
+
+    /**
      * @param LoopExtendedInterface $loop
      */
     public function __construct(LoopExtendedInterface $loop)
@@ -84,6 +89,24 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
         unset($this->startCallback);
         unset($this->stopCallback);
         unset($this->stopFlags);
+    }
+
+    /**
+     * @param string $key
+     * @param mixed $val
+     */
+    public function setParam($key, $val)
+    {
+        $this->params[$key] = $val;
+    }
+
+    /**
+     * @param string $key
+     * @return mixed|null
+     */
+    public function getParam($key)
+    {
+        return isset($this->params[$key]) ? $this->params[$key] : null;
     }
 
     /**

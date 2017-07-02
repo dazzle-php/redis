@@ -9,6 +9,18 @@ use Dazzle\Promise\PromiseInterface;
 interface SimulationInterface extends EventEmitterInterface
 {
     /**
+     * @param string $key
+     * @param mixed $val
+     */
+    public function setParam($key, $val);
+
+    /**
+     * @param string $key
+     * @return mixed|null
+     */
+    public function getParam($key);
+
+    /**
      * @return LoopInterface
      */
     public function getLoop();
