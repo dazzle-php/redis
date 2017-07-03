@@ -8,13 +8,13 @@ use Dazzle\Redis\Redis;
 
 $loop = new Loop(new SelectLoop());
 
-// $redis = new Redis('tcp://127.0.0.1:6379', $loop);
+$redis = new Redis('tcp://127.0.0.1:6379', $loop);
 
 $ret = [];
 
 $loop = new Loop(new SelectLoop());
 
-$redis = new Redis('192.168.99.100:32768', $loop);
+//$redis = new Redis('192.168.99.100:32768', $loop);
 
 $ret = [];
 
