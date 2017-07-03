@@ -1,0 +1,614 @@
+<?php
+
+namespace Dazzle\Redis\Command\Compose;
+
+use Dazzle\Redis\Command\Builder;
+use Dazzle\Redis\Command\Enum;
+use Dazzle\Redis\Driver\Request;
+
+trait ApiKeyValTrait
+{
+    /**
+     * @param Request $request
+     * @return mixed
+     */
+    abstract function dispatch(Request $request);
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function append($key, $value)
+    {
+        $command = Enum::APPEND;
+        $args = [$key, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function bitCount($key, $start = 0, $end = 0)
+    {
+        $command = Enum::BITCOUNT;
+        $args = [$key, $start, $end];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function bitField($key, $subCommand = null, ...$param)
+    {
+        $command = Enum::BITFIELD;
+        switch ($subCommand = strtoupper($subCommand)) {
+            case 'GET' : {
+                list ($type, $offset) = $param;
+                $args = [$subCommand, $type, $offset];
+                break;
+            }
+            case 'SET' : {
+                list ($type, $offset, $value) = $param;
+                $args = [$subCommand, $type, $offset, $value];
+                break;
+            }
+            case 'INCRBY' : {
+                list ($type, $offset, $increment) = $param;
+                $args = [$type, $offset, $increment];
+                break;
+            }
+            case 'OVERFLOW' : {
+                list ($behavior) = $param;
+                $args = [$subCommand, $behavior];
+                break;
+            }
+            default : {
+                $args = [];
+                break;
+            }
+        }
+        $args = array_filter($args);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function bitOp($operation, $dstKey, $srcKey, ...$keys)
+    {
+        $command = Enum::BITOP;
+        $args = [$operation, $dstKey, $srcKey];
+        $args = array_merge($args, $keys);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function bitPos($key, $bit, $start = 0, $end = 0)
+    {
+        $command = Enum::BITPOS;
+        $args = [$key, $bit, $start, $end];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function decr($key)
+    {
+        // TODO: Implement decr() method.
+        $command = Enum::DECR;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function decrBy($key, $decrement)
+    {
+        // TODO: Implement decrBy() method.
+        $command = Enum::DECRBY;
+        $args = [$key, $decrement];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function get($key)
+    {
+        $command = Enum::GET;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function getBit($key, $offset)
+    {
+        // TODO: Implement getBit() method.
+        $command = Enum::GETBIT;
+        $args = [$key, $offset];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function getRange($key, $start, $end)
+    {
+        // TODO: Implement getRange() method.
+        $command = Enum::GETRANGE;
+        $args = [$key, $start, $end];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function getSet($key, $value)
+    {
+        // TODO: Implement getSet() method.
+        $command = Enum::GETSET;
+        $args = [$key, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function incr($key)
+    {
+        $command = Enum::INCR;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function incrBy($key, $increment)
+    {
+        // TODO: Implement incrBy() method.
+        $command = Enum::INCRBY;
+        $args = [$key, $increment];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function incrByFloat($key, $increment)
+    {
+        // TODO: Implement incrByFloat() method.
+        $command = Enum::INCRBYFLOAT;
+        $args = [$key, $increment];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function set($key, $value, array $options = [])
+    {
+        $command = Enum::SET;
+        array_unshift($options, $key, $value);
+        $args = $options;
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function setBit($key, $offset, $value)
+    {
+        // TODO: Implement setBit() method.
+        $command = Enum::SETBIT;
+        $args = [$key, $offset, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function setEx($key, $seconds, $value)
+    {
+        $command = Enum::SETEX;
+        $args = [$key, $seconds, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function setNx($key, $value)
+    {
+        $command = Enum::SETNX;
+        $args = [$key, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function setRange($key, $offset, $value)
+    {
+        $command = Enum::SETRANGE;
+        $args = [$key, $offset, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function pSetEx($key, $milliseconds, $value)
+    {
+        $command = Enum::PSETEX;
+        $args = [$key, $milliseconds, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function mGet($key, ...$values)
+    {
+        // TODO: Implement mGet() method.
+        $command = Enum::MGET;
+        $args = [$key];
+        $args = array_merge($args, $values);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function mSet(array $kvMap)
+    {
+        // TODO: Implement mSet() method.
+        $command = Enum::MSET;
+        $args = $kvMap;
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function mSetNx($kvMap)
+    {
+        // TODO: Implement mSetNx() method.
+        $command = Enum::MSETNX;
+        $args = $kvMap;
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function strLen($key)
+    {
+        // TODO: Implement strLen() method.
+        $command = Enum::STRLEN;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function del($key,...$keys)
+    {
+        $command = Enum::DEL;
+        $keys[] = $key;
+        $args = $keys;
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function dump($key)
+    {
+        // TODO: Implement dump() method.
+        $command = Enum::DUMP;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function exists($key, ...$keys)
+    {
+        // TODO: Implement exists() method.
+        $command = Enum::EXISTS;
+        $args = [$key];
+        $args = array_merge($args, $keys);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function expire($key, $seconds)
+    {
+        // TODO: Implement expire() method.
+        $command = Enum::EXPIRE;
+        $args = [$key, $seconds];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function expireAt($key, $timestamp)
+    {
+        // TODO: Implement expireAt() method.
+        $command = Enum::EXPIREAT;
+        $args = [$key, $timestamp];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function persist($key)
+    {
+        $command = Enum::PERSIST;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function pExpire($key, $milliseconds)
+    {
+        // TODO: Implement pExpire() method.
+        $command = Enum::PEXPIRE;
+        $args = [$key, $milliseconds];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function pExpireAt($key, $milliseconds)
+    {
+        // TODO: Implement pExpireAt() method.
+        $command = Enum::PEXPIREAT;
+        $args = [$key, $milliseconds];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function touch($key, ...$keys)
+    {
+        $command = Enum::TOUCH;
+        $args = [$key];
+        $args = array_merge($args, $keys);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function ttl($key)
+    {
+        // TODO: Implement ttl() method.
+        $command = Enum::TTL;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function type($key)
+    {
+        $command = Enum::TYPE;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function unLink($key, ...$keys)
+    {
+        $command = Enum::UNLINK;
+        $args = [$key];
+        $args = array_merge($args, $keys);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function wait($numSlaves, $timeout)
+    {
+        // TODO: Implement wait() method.
+        $command = Enum::WAIT;
+        $args = [$numSlaves, $timeout];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function randomKey()
+    {
+        // TODO: Implement randomKey() method.
+        $command = Enum::RANDOMKEY;
+
+        return $this->dispatch(Builder::build($command));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function rename($key, $newKey)
+    {
+        $command = Enum::RENAME;
+        $args = [$key, $newKey];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function renameNx($key, $newKey)
+    {
+        $command = Enum::RENAMENX;
+        $args = [$key, $newKey];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function restore($key, $ttl, $value)
+    {
+        // TODO: Implement restore() method.
+        $command = Enum::RESTORE;
+        $args = [$key, $ttl, $value];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function pTtl($key)
+    {
+        $command = Enum::PTTL;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function move($key, $db)
+    {
+        // TODO: Implement move() method.
+        $command = Enum::MOVE;
+        $args = [$key, $db];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function scan($cursor, array $options = [])
+    {
+        $command = Enum::SCAN;
+        $args = [$cursor];
+        $args = array_merge($args, $options);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function sort($key, array $options = [])
+    {
+        // TODO: Implement sort() method.
+        $command = Enum::SORT;
+        $args = [$key];
+        $args = array_merge($args, $options);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+}

@@ -8,4 +8,9 @@ if (!class_exists('Error'))
     {}
 }
 
+if (!defined('TEST_DB_REDIS_ENDPOINT'))
+{
+    define('TEST_DB_REDIS_ENDPOINT', getenv('TEST_DB_REDIS_ENDPOINT') ? getenv('TEST_DB_REDIS_ENDPOINT') : 'tcp://127.0.0.1:6379');
+}
+
 date_default_timezone_set('UTC');
