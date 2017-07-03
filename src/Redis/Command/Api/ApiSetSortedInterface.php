@@ -69,7 +69,7 @@ interface ApiSetSortedInterface
      * @param array $options
      * @return mixed
      */
-    public function zRange($key, $star, $stop, array $options = []);
+    public function zRange($key, $star = 0, $stop = -1, $withScores = false);
 
     /**
      * @doc https://redis.io/commands/zrangebylex
