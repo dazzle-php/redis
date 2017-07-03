@@ -18,12 +18,16 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zAdd($key, array $options = [])
+    public function zAdd($key, array $options = [], array $scoreMembers = [])
     {
-        // TODO: Implement zAdd() method.
         $command = Enum::ZADD;
-        $args = [$key];
-        $args = array_merge($args, $options);
+        $args = array_merge([$key], $options);
+        if (!empty($scoreMembers)) {
+            foreach ($scoreMembers as $score => $member) {
+                $args[] = (float) $score;
+                $args[] = $member;
+            }
+        }
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -34,7 +38,6 @@ trait ApiSetSortedTrait
      */
     public function zCard($key)
     {
-        // TODO: Implement zCard() method.
         $command = Enum::ZCARD;
         $args = [$key];
 
@@ -47,7 +50,6 @@ trait ApiSetSortedTrait
      */
     public function zCount($key, $min, $max)
     {
-        // TODO: Implement zCount() method.
         $command = Enum::ZCOUNT;
         $args = [$key, $min, $max];
 
@@ -60,7 +62,6 @@ trait ApiSetSortedTrait
      */
     public function zIncrBy($key, $increment, $member)
     {
-        // TODO: Implement zIncrBy() method.
         $command = Enum::ZINCRBY;
         $args = [$key, $increment, $member];
 
@@ -86,7 +87,6 @@ trait ApiSetSortedTrait
      */
     public function zLexCount($key, $min, $max)
     {
-        // TODO: Implement zLexCount() method.
         $command = Enum::ZLEXCOUNT;
         $args = [$key, $min, $max];
 
@@ -97,12 +97,21 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zRange($key, $star, $stop, array $options = [])
+    public function zRange($key, $star = 0, $stop = -1, $withScores = false)
     {
-        // TODO: Implement zRange() method.
         $command = Enum::ZRANGE;
-        $args = [$key, $star,$stop];
-        $args = array_merge($args, $options);
+        $args = [$key, $star, $stop];
+        if ($withScores) {
+            $args[] = 'WITHSCORES';
+            return $this->dispatch(Builder::build($command, $args))->then(function ($value) {
+                $len = count($value);
+                $ret = [];
+                for ($i=0; $i<$len; $i+=2) {
+                    $ret[$value[$i]] = $value[$i+1];
+                }
+                return $ret;
+            });
+        }
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -113,7 +122,6 @@ trait ApiSetSortedTrait
      */
     public function zRangeByLex($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByLex() method.
         $command = Enum::ZRANGEBYLEX;
         $args = [$key, $min, $max];
         $args = array_merge($args,$options);
@@ -127,7 +135,6 @@ trait ApiSetSortedTrait
      */
     public function zRevRangeByLex($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByLex() method.
         $command = Enum::ZREVRANGEBYLEX;
         $args = [$key, $max,$min];
         $args = array_merge($args,$options);
@@ -141,7 +148,6 @@ trait ApiSetSortedTrait
      */
     public function zRangeByScore($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRangeByScore() method.
         $command = Enum::ZRANGEBYSCORE;
         $args = [$key, $min,$max];
         $args = array_merge($args, $options);
@@ -155,7 +161,6 @@ trait ApiSetSortedTrait
      */
     public function zRank($key, $member)
     {
-        // TODO: Implement zRank() method.
         $command = Enum::ZRANK;
         $args = [$key,$member];
 
@@ -168,7 +173,6 @@ trait ApiSetSortedTrait
      */
     public function zRem($key, ...$members)
     {
-        // TODO: Implement zRem() method.
         $command = Enum::ZREM;
         $args = [$key];
         $args = array_merge($args, $members);
@@ -180,11 +184,11 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zRemRangeByLex($key, $min, $max)
+    public function zRemRangeByLex($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRemRangeByLex() method.
         $command = Enum::ZREMRANGEBYLEX;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -195,7 +199,6 @@ trait ApiSetSortedTrait
      */
     public function zRemRangeByRank($key, $start, $stop)
     {
-        // TODO: Implement zRemRangeByRank() method.
         $command = Enum::ZREMRANGEBYRANK;
         $args = [$key, $start,$stop];
 
@@ -206,11 +209,11 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zRemRangeByScore($key, $min, $max)
+    public function zRemRangeByScore($key, $min, $max, array $options = [])
     {
-        // TODO: Implement zRemRangeByScore() method.
         $command = Enum::ZREMRANGEBYSCORE;
         $args = [$key, $min, $max];
+        $args = array_merge($args, $options);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -221,7 +224,6 @@ trait ApiSetSortedTrait
      */
     public function zRevRange($key, $start, $stop, array $options = [])
     {
-        // TODO: Implement zRevRange() method.
         $command = Enum::ZREVRANGE;
         $args = [$key, $start, $stop];
         $args = array_merge($args, $options);
@@ -235,7 +237,6 @@ trait ApiSetSortedTrait
      */
     public function zRevRangeByScore($key, $max, $min, array $options = [])
     {
-        // TODO: Implement zRevRangeByScore() method.
         $command = Enum::ZREVRANGEBYSCORE;
         $args = [$key,$max,$min];
         $args = array_merge($args, $options);
@@ -249,7 +250,6 @@ trait ApiSetSortedTrait
      */
     public function zRevRank($key, $member)
     {
-        // TODO: Implement zRevRank() method.
         $command = Enum::ZREVRANK;
         $args = [$key,$member];
 
@@ -262,7 +262,6 @@ trait ApiSetSortedTrait
      */
     public function zScore($key, $member)
     {
-        // TODO: Implement zScore() method.
         $command = Enum::ZSCORE;
         $args = [$key,$member];
 
