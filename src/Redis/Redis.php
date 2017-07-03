@@ -18,8 +18,9 @@ use Dazzle\Socket\SocketInterface;
 use Dazzle\Throwable\Exception\Runtime\ExecutionException;
 use Dazzle\Throwable\Exception\Runtime\UnderflowException;
 use Error;
+use Exception;
 
-class Redis
+class Redis extends BaseEventEmitter implements RedisInterface
 {
     use LoopAwareTrait;
     use Command\Compose\ApiChannelTrait;
@@ -41,6 +42,31 @@ class Redis
     protected $endpoint;
 
     /**
+     * @var SocketInterface
+     */
+    protected $stream;
+
+    /**
+     * @var DriverInterface
+     */
+    protected $driver;
+
+    /**
+     * @var bool
+     */
+    protected $isConnected;
+
+    /**
+     * @var bool
+     */
+    protected $isBeingDisconnected;
+
+    /**
+     * @var array
+     */
+    private $reqs;
+
+    /**
      * @param string $endpoint
      * @param LoopInterface $loop
      */
@@ -48,8 +74,13 @@ class Redis
     {
         $this->endpoint = $endpoint;
         $this->loop = $loop;
-        $this->dispatcher = new Dispatcher($loop);
-        $this->driver = $this->dispatcher->getDriver();
+        $this->stream = null;
+        $this->driver = new Driver();
+
+        $this->isConnected = false;
+        $this->isBeingDisconnected = false;
+
+        $this->reqs = [];
     }
 
     /**
@@ -57,39 +88,242 @@ class Redis
      */
     public function __destruct()
     {
-
+        $this->stop();
     }
 
     /**
-     * Pipe Redis request.
+     * @override
+     * @inheritDoc
+     */
+    public function isStarted()
+    {
+        return $this->isConnected;
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function isBusy()
+    {
+        return !empty($this->reqs);
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function start()
+    {
+        if ($this->isStarted())
+        {
+            return false;
+        }
+
+        $ex = null;
+        $stream = null;
+
+        try
+        {
+            $stream = $this->createClient($this->endpoint);
+        }
+        catch (Error $ex)
+        {}
+        catch (Exception $ex)
+        {}
+
+        if ($ex !== null)
+        {
+            return false;
+        }
+
+        $this->isConnected = true;
+        $this->isBeingDisconnected = false;
+        $this->stream = $stream;
+
+        // TODO patch missing pub/sub, pipeline, auth
+        $this->handleStart();
+        $this->emit('start', [ $this ]);
+
+        return true;
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function stop()
+    {
+        if (!$this->isStarted())
+        {
+            return false;
+        }
+
+        $this->isBeingDisconnected = true;
+        $this->isConnected = false;
+
+        $this->stream->close();
+        $this->stream = null;
+
+        foreach ($this->reqs as $req)
+        {
+            $req->reject(new ExecutionException('Connection has been closed!'));
+        }
+
+        $this->reqs = [];
+
+         // TODO patch missing pub/sub, pipeline, auth
+        $this->handleStop();
+        $this->emit('stop', [ $this ]);
+
+        return true;
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function end()
+    {
+        if (!$this->isStarted() || $this->isBeingDisconnected)
+        {
+            return false;
+        }
+
+        $this->isBeingDisconnected = true;
+
+        return true;
+    }
+
+    /**
+     * Dispatch Redis request.
      *
      * @param Request $command
      * @return PromiseInterface
      */
-    private function pipe(Request $command)
+    protected function dispatch(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
-        if ($this->dispatcher->isEnding())
-        {
-            $request->reject(new RuntimeException('Connection closed'));
-        } 
-        else 
-        {
-            $payload = $this->driver->commands($command);
 
-            $this->dispatcher->on('request', function () use ($payload) {
-                $this->dispatcher->handleRequest($payload);
-            });
-
-            $this->dispatcher->appendRequest($request);
+        if ($this->isBeingDisconnected)
+        {
+            $request->reject(new ExecutionException('Redis client connection is being stopped now.'));
+        }
+        else
+        {
+            $this->stream->write($this->driver->commands($command));
+            $this->reqs[] = $request;
         }
 
         return $promise;
     }
 
-    public function connect($config = [])
+    /**
+     * @internal
+     */
+    protected function handleStart()
     {
-        $this->dispatcher->watch($this->endpoint);
+        if ($this->stream !== null)
+        {
+            $this->stream->on('data', [ $this, 'handleData' ]);
+            $this->stream->on('close', [ $this, 'stop' ]);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    protected function handleStop()
+    {
+        if ($this->stream !== null)
+        {
+            $this->stream->removeListener('data', [ $this, 'handleData' ]);
+            $this->stream->removeListener('close', [ $this, 'stop' ]);
+        }
+    }
+
+    /**
+     * @internal
+     * @param SocketInterface $stream
+     * @param string $chunk
+     */
+    public function handleData($stream, $chunk)
+    {
+        try
+        {
+            $models = $this->driver->parseResponse($chunk);
+        }
+        catch (ParserException $error)
+        {
+            $this->emit('error', [ $this, $error ]);
+            $this->stop();
+            return;
+        }
+
+        foreach ($models as $data)
+        {
+            try
+            {
+                $this->handleMessage($data);
+            }
+            catch (UnderflowException $error)
+            {
+                $this->emit('error', [ $this, $error ]);
+                $this->stop();
+                return;
+            }
+        }
+    }
+
+    /**
+     * @internal
+     * @param ModelInterface $message
+     */
+    protected function handleMessage(ModelInterface $message)
+    {
+        if (!$this->reqs)
+        {
+            throw new UnderflowException('Unexpected reply received, no matching request found');
+        }
+
+        $request = array_shift($this->reqs);
+
+        if ($message instanceof ErrorReply)
+        {
+            $request->reject($message);
+        }
+        else
+        {
+            $request->resolve($message->getValueNative());
+        }
+
+        if ($this->isBeingDisconnected && !$this->isBusy())
+        {
+            $this->stop();
+        }
+    }
+
+    /**
+     * Create socket client with connection to Redis database.
+     *
+     * @param string $endpoint
+     * @return SocketInterface
+     * @throws ExecutionException
+     */
+    protected function createClient($endpoint)
+    {
+        $ex = null;
+
+        try
+        {
+            return new Socket($endpoint, $this->loop);
+        }
+        catch (Error $ex)
+        {}
+        catch (Exception $ex)
+        {}
+
+        throw new ExecutionException('Redis connection socket could not be created!', 0, $ex);
     }
 };
