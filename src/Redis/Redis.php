@@ -59,7 +59,7 @@ class Redis
      * @param Request $command
      * @return PromiseInterface
      */
-    private function pipe(Request $command)
+    public function dispatch(Request $command)
     {
         $request = new Deferred();
         $promise = $request->getPromise();
