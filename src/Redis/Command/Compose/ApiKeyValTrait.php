@@ -107,7 +107,6 @@ trait ApiKeyValTrait
      */
     public function decr($key)
     {
-        // TODO: Implement decr() method.
         $command = Enum::DECR;
         $args = [$key];
 
@@ -120,7 +119,6 @@ trait ApiKeyValTrait
      */
     public function decrBy($key, $decrement)
     {
-        // TODO: Implement decrBy() method.
         $command = Enum::DECRBY;
         $args = [$key, $decrement];
 
@@ -145,7 +143,6 @@ trait ApiKeyValTrait
      */
     public function getBit($key, $offset)
     {
-        // TODO: Implement getBit() method.
         $command = Enum::GETBIT;
         $args = [$key, $offset];
 
@@ -171,7 +168,6 @@ trait ApiKeyValTrait
      */
     public function getSet($key, $value)
     {
-        // TODO: Implement getSet() method.
         $command = Enum::GETSET;
         $args = [$key, $value];
 
@@ -235,7 +231,6 @@ trait ApiKeyValTrait
      */
     public function setBit($key, $offset, $value)
     {
-        // TODO: Implement setBit() method.
         $command = Enum::SETBIT;
         $args = [$key, $offset, $value];
 
