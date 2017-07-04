@@ -85,6 +85,16 @@ class TModule extends TUnit
             $this->fail($ex->getMessage());
         }
 
+        if ($this->sim->getState() === Simulation::STATE_FAILED)
+        {
+            $this->fail($this->sim->getStateMessage());
+        }
+
+        if ($this->sim->getState() === Simulation::STATE_SKIPPED)
+        {
+            $this->markTestSkipped($this->sim->getStateMessage());
+        }
+
         return $this;
     }
 
