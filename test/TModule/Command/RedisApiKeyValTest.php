@@ -19,7 +19,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetsAndGetsData(RedisInterface $redis)
     {
-        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VAL',

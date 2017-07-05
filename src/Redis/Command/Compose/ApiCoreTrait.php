@@ -105,17 +105,23 @@ trait ApiCoreTrait
 
         return $this->dispatch(Builder::build($command, $section))->then(function ($value) {
             if ($value) {
-                $ret = explode(PHP_EOL, $value);
+                $ret = explode("\r\n", $value);
                 $handled = [];
                 $lastKey = '';
-                foreach ($ret as $_ => $v) {
-                    if (($pos = strpos($v, '#')) !== false) {
+
+                foreach ($ret as $_ => $v)
+                {
+                    if (($pos = strpos($v, '#')) !== false)
+                    {
                         $lastKey = strtolower(substr($v,$pos+2));
                         $handled[$lastKey] = [];
                         continue;
                     }
-                    $statMap = explode(':', $v);
-                    if ($statMap[0]) {
+                    if ($v === '') {
+                        continue;
+                    }
+                    if (($statMap = explode(':', $v)) && $statMap[0] && $statMap[1])
+                    {
                         list($name, $stat) = explode(':', $v);
                         $handled[$lastKey][$name] = $stat;
                     }

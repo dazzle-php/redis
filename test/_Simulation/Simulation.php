@@ -22,6 +22,26 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
     const EVENTS_COMPARE_RANDOMLY = 2;
 
     /**
+     * @var int
+     */
+    const STATE_PENDING = 0;
+
+    /**
+     * @var int
+     */
+    const STATE_SUCCEED = 1;
+
+    /**
+     * @var int
+     */
+    const STATE_FAILED = 2;
+
+    /**
+     * @var int
+     */
+    const STATE_SKIPPED = 4;
+
+    /**
      * @var LoopExtendedInterface
      */
     private $loop;
@@ -37,9 +57,14 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
     private $events;
 
     /**
+     * @var int
+     */
+    private $state;
+
+    /**
      * @var string|null
      */
-    private $failureMessage;
+    private $stateMessage;
 
     /**
      * @var callable(SimulationInterface)
@@ -68,8 +93,10 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
     {
         $this->loop = $loop;
         $this->scenario = function() {};
+        $this->state = static::STATE_PENDING;
         $this->events = [];
-        $this->failureMessage = null;
+        $this->stateMessage = null;
+        $this->skipMessage = null;
         $this->startCallback = function() {};
         $this->stopCallback = function() {};
         $this->stopFlags = false;
@@ -85,7 +112,8 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
         unset($loop);
         unset($this->scenario);
         unset($this->events);
-        unset($this->failureMessage);
+        unset($this->state);
+        unset($this->stateMessage);
         unset($this->startCallback);
         unset($this->stopCallback);
         unset($this->stopFlags);
@@ -134,6 +162,22 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
     }
 
     /**
+     * @return int
+     */
+    public function getState()
+    {
+        return $this->state;
+    }
+
+    /**
+     * @return int
+     */
+    public function getStateMessage()
+    {
+        return $this->stateMessage;
+    }
+
+    /**
      *
      */
     public function begin()
@@ -146,6 +190,17 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
      */
     public function done()
     {
+        $this->state = static::STATE_SUCCEED;
+        $this->stop();
+    }
+
+    /**
+     *
+     */
+    public function skip($message)
+    {
+        $this->stateMessage = $message;
+        $this->state = static::STATE_SKIPPED;
         $this->stop();
     }
 
@@ -154,7 +209,8 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
      */
     public function fail($message)
     {
-        $this->failureMessage = $message;
+        $this->stateMessage = $message;
+        $this->state = static::STATE_FAILED;
         $this->stop();
     }
 
@@ -251,11 +307,6 @@ class Simulation extends BaseEventEmitter implements SimulationInterface
         });
 
         $loop->start();
-
-        if ($sim->failureMessage !== null)
-        {
-            throw new Exception($sim->failureMessage);
-        }
     }
 
     /**

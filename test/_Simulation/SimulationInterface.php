@@ -26,9 +26,24 @@ interface SimulationInterface extends EventEmitterInterface
     public function getLoop();
 
     /**
+     * @return int
+     */
+    public function getState();
+
+    /**
+     * @return string
+     */
+    public function getStateMessage();
+
+    /**
      *
      */
     public function done();
+
+    /**
+     *
+     */
+    public function skip($message);
 
     /**
      * @param string $message
