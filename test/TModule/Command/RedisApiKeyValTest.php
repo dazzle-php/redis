@@ -64,7 +64,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -73,14 +73,14 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
-                'VAL' => 'FOOBAR',
+                'VAL' => "foobar",
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
                     return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->bitCount($params['KEY'],0, -1);
+                    return $redis->bitCount($params['KEY']);
                 })
                 ->then(function($value) use($params) {
                     $this->assertSame($value, 26);
@@ -89,7 +89,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -107,36 +107,37 @@ class RedisApiKeyValTest extends TModule
                     $redis->setBit($params['KEY_1'], 0, $params['VAL_1']);
                     $redis->setBit($params['KEY_2'], 0, $params['VAL_2']);
                 })
-                ->then(function() use($params, $redis) {
-                    return $redis->bitOp('AND', $params['KEY_1'], $params['KEY_2']);
+                ->then(function() use($params, $redis) {                    
+                    $redis->bitOp('AND', $params['KEY_1'], $params['KEY_2']);
+
+                    return $redis->getBit($params['KEY_1'], 0);
                 })
-                ->then(function($value) use($params) {
-                    $params['VAL_1'] = $params['VAL_1']&$params['VAL_2'];
-                    $this->assertSame($value, $params['VAL_1']);
+                ->then(function($value) use($params, $redis) {
+                    $this->assertSame($value, 0);
+                    $redis->bitOp('OR', $params['KEY_1'], $params['KEY_2']);
                 
-                    return $redis->bitOp('OR', $params['KEY_1'], $params['KEY_2']);
+                    return $redis->getBit($params['KEY_1'], 0);
                 })
                 ->then(function ($value) use ($params, $redis) {
-                    $params['VAL_1'] = $params['VAL_1']|$params['VAL_2'];
-                    $this->assertSame($value, $params['VAL_1']);
+                    $this->assertSame($value, 0);
+                    $redis->bitOp('XOR', $params['KEY_1'], $params['KEY_2']);
 
-                    return $redis->bitOp('XOR', $params['KEY_1'], $params['KEY_2']);
+                    return $redis->getBit($params['KEY_1'], 0);
                 })
                 ->then(function ($value) use ($params, $redis) {
-                    $params['VAL_1'] = $params['VAL_1']^$params['VAL_2'];
-                    $this->assertSame($value, $params['VAL_1']);
+                    $this->assertSame($value, 0);
+                    $redis->bitOp('NOT', $params['KEY_1'], $params['KEY_1']);
 
-                    return $redis->bitOp('NOT', $params['KEY_1'], $params['KEY_1']);
+                    return $redis->getBit($params['KEY_1'], 0);
                 })
                 ->then(function ($value) use ($params) {
-                    $params['VAL_1'] = !$params['VAL_1'];
-                    $this->assertSame($value, $params['VAL_1']);
+                    $this->assertSame($value, 1);
                 });
         });
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -149,7 +150,7 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->se($params['KEY'], $params['VAL']);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
                     return $redis->bitPos($params['KEY'], 0);
@@ -161,7 +162,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -186,7 +187,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -212,7 +213,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -237,7 +238,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -257,7 +258,7 @@ class RedisApiKeyValTest extends TModule
                     return $redis->getSet($params['KEY'], $params['VAL_2']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $paras['VAL']);
+                    $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
@@ -335,7 +336,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -360,7 +361,7 @@ class RedisApiKeyValTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -401,7 +402,7 @@ class RedisApiKeyValTest extends TModule
                     return $redis->setEx($params['KEY'], 1, $params['VAL']);
                 })
                 ->then(function($value) use($params, $redis) {
-                    $this->assertSame($value, 1);
+                    $this->assertSame($value, 'OK');
                     sleep(1);
                     return $redis->setNx($params['KEY'], $params['VAL']);
                 })
@@ -412,7 +413,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -438,7 +439,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -451,21 +452,21 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    $val = $redis->pSetEx($params['KEY'], 1, $params['VAL']);
-                    usleep(10);
+                    $val = $redis->pSetEx($params['KEY'], 1000 * 1000 * 60, $params['VAL']);
 
                     return $val;
                 })->then(function () use ($params, $redis) {
-                    return $redis->get($params['KEY']);
+                    
+                    return $redis->pttl($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, null);
+                    $this->assertTrue($value > 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -474,9 +475,9 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
-                'VAL_1' => 1,
+                'VAL_1' => 'INPUT_VAL_1',
                 'KEY_2' => 'INPUT_KEY_2',
-                'VAL_2' => 2,
+                'VAL_2' => 'INPUT_VAL_2',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
@@ -496,7 +497,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -505,15 +506,15 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
-                'VAL_1' => 1,
+                'VAL_1' => 'INPUT_VAL_1',
                 'KEY_2' => 'INPUT_KEY_2',
-                'VAL_2' => 2,  
+                'VAL_2' => 'INPUT_VAL_2',  
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
                     return $redis->mSet([
-                        [$params['KEY_1'] => $params['VAL_1']],
-                        [$params['KEY_2'] => $params['VAL_2']],
+                        $params['KEY_1'] => $params['VAL_1'],
+                        $params['KEY_2'] => $params['VAL_2'],
                     ]);
                 })
                 ->then(function() use($params, $redis) {
@@ -521,15 +522,15 @@ class RedisApiKeyValTest extends TModule
                 })
                 ->then(function($value) use($params) {
                     $this->assertSame($value, [
-                        (string)$params['VAL_1'],
-                        (string)$params['VAL_2'],
+                        $params['VAL_1'],
+                        $params['VAL_2'],
                     ]);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -537,24 +538,32 @@ class RedisApiKeyValTest extends TModule
     {
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
-                'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
+                'KEY_1' => 'INPUT_KEY_1',
+                'VAL_1' => 'INPUT_VAL_1',
+                'KEY_2' => 'INPUT_KEY_2',
+                'VAL_2' => 'INPUT_VAL_2',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->mSetNx([
+                        $params['KEY_1'] => $params['VAL_1'],
+                        $params['KEY_2'] => $params['VAL_2'],
+                    ]);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->mGet($params['KEY_1'], $params['KEY_2']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertSame($value, [
+                        $params['VAL_1'],
+                        $params['VAL_2'],
+                    ]);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -563,23 +572,23 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
+                'VAL' => 'INPUT_VAL',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->strLen($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertSame($value, strlen($params['VAL']));
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -604,7 +613,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -617,19 +626,19 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->dump($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertNotNull($value);
                 });
-        }); 
+        });
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -645,8 +654,8 @@ class RedisApiKeyValTest extends TModule
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
                     return $redis->mSet([
-                        [$params['KEY_1'] => $params['VAL_1']],
-                        [$params['KEY_2'] => $params['VAL_2']],
+                        $params['KEY_1'] => $params['VAL_1'],
+                        $params['KEY_2'] => $params['VAL_2'],
                     ]);
                 })
                 ->then(function() use($params, $redis) {
@@ -659,7 +668,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -672,19 +681,19 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->setEx($params['KEY'], 60, $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->ttl($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertTrue($value > 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -697,19 +706,20 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    $redis->set($params['KEY'], $params['VAL']);
+                    $redis->expireAt($params['KEY'], time() + 60);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->ttl($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertTrue($value > 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -722,19 +732,19 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->setEx($params['KEY'], 60, $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->persist($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertSame($value, 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -747,19 +757,21 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    $redis->pExpire($params['KEY'], 60 * 1000 * 1000 );
+
+                    return $redis->pTtl($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertTrue($value > 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -772,44 +784,21 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    $redis->pExpireAt($params['KEY'], (time() + 60) * 1000 );
+
+                    return $redis->pTtl($params['KEY']);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertTrue($value > 1);
                 });
-        }); 
+        });  
     }
 
-      /**
-     * @group testing
-     * @dataProvider redisProvider
-     * @param RedisInterface $redis
-     */
-    public function testRedis_SetDataExpireAndGetTTL(RedisInterface $redis)
-    {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
-            $params = [
-                'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
-            ];
-            return Promise::doResolve()
-                ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
-                })
-                ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
-                })
-                ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
-                });
-        }); 
-    }
-
-      /**
-     * @group testing
+    /**
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -818,14 +807,14 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
+                'VAL' => 'string',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->type($params['KEY']);
                 })
                 ->then(function($value) use($params) {
                     $this->assertSame($value, $params['VAL']);
@@ -834,7 +823,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group ignore
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -847,19 +836,18 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
-                })
-                ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    // $redis->set($params['KEY'], $params['VAL']);
+
+                    // return $redis->wait(1, 0);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    // $this->assertSame($value, 1);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -872,19 +860,19 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->randomKey();
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertSame($value, $params['KEY']);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -893,14 +881,17 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
+                'NEW_KEY' => 'NEW_INPUT_KEY',
+                'VAL' => 'INPUT_VAL',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    $redis->rename($params['KEY'], $params['NEW_KEY']);
+                    
+                    return $redis->get($params['NEW_KEY']);
                 })
                 ->then(function($value) use($params) {
                     $this->assertSame($value, $params['VAL']);
@@ -909,23 +900,24 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
-    public function testRedis_SetDataAndRanameKeyEx(RedisInterface $redis)
+    public function testRedis_SetDataAndRanameKeyNx(RedisInterface $redis)
     {
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
+                'NEW_KEY' => 'INPUT_NEW_KEY',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    return $redis->set($params['KEY'], $params['VAL']);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    return $redis->renameNx($params['KEY'], $params['NEW_KEY']);
                 })
                 ->then(function($value) use($params) {
                     $this->assertSame($value, $params['VAL']);
@@ -934,7 +926,7 @@ class RedisApiKeyValTest extends TModule
     }
 
       /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -943,48 +935,27 @@ class RedisApiKeyValTest extends TModule
        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
+                'VAL' => 'INPUT_VAL',
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    $redis->set($params['KEY'], $params['VAL']);
+
+                    return $redis->dump($params['KEY']);
                 })
-                ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                ->then(function($value) use($params, $redis) {
+                    $redis->del($params['KEY']);
+
+                    return $redis->restore($params['KEY'], 0, $value);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    $this->assertSame($value, 'OK');
                 });
         }); 
     }
 
-      /**
-     * @group testing
-     * @dataProvider redisProvider
-     * @param RedisInterface $redis
-     */
-    public function testRedis_PTTL(RedisInterface $redis)
-    {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
-            $params = [
-                'KEY' => 'INPUT_KEY',
-                'VAL' => 1,
-            ];
-            return Promise::doResolve()
-                ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
-                })
-                ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
-                })
-                ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
-                });
-        }); 
-    }
-
-      /**
-     * @group testing
+    /**
+     * @group ignore
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -997,19 +968,19 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
 
       /**
-     * @group testing
+     * @group ignore
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -1022,18 +993,18 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
       /**
-     * @group testing
+     * @group ignore
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -1046,13 +1017,13 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->setBit($params['KEY'], 0, 1);
+                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->getBit($params['KEY'], 0);
+                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, $params['VAL']);
+                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
@@ -1071,16 +1042,13 @@ class RedisApiKeyValTest extends TModule
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    return $redis->set($params['KEY_1'], '')
-                    ->then(function () use ($params, $redis) {
-                        return $redis->set($params['KEY_2'], '');
-                    });
+                    //    
                 })
                 ->then(function() use($params, $redis) {
-                    return $redis->exists($params['KEY_1'], $params['KEY_2']);
+                    // 
                 })
                 ->then(function($value) use($params) {
-                    $this->assertSame($value, count($params));
+                    // 
                 });
         });
     }
