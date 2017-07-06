@@ -34,7 +34,8 @@ interface ApiKeyValInterface
     public function bitField($key, $subCommand = null, ...$param);
 
     /**
-     * @doc
+     * @doc https://redis.io/commands/bitop
+     * @since 2.6.0
      * @param $operation
      * @param $dstKey
      * @param $srcKey

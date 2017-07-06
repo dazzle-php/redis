@@ -28,7 +28,9 @@ class RedisApiKeyValTest extends TModule
                 ->then(function() use($params, $redis) {
                     return $redis->set($params['KEY'], $params['VAL']);
                 })
-                ->then(function() use($params, $redis) {
+                ->then(function($value) use($params, $redis) {
+                    $this->assertSame($value, 'OK');
+                    
                     return $redis->get($params['KEY']);
                 })
                 ->then(function($value) use($params) {
@@ -44,7 +46,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetsAndAppendsData(RedisInterface $redis)
     {
-         $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+         $this->checkRedisVersionedCommand($redis, '2.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VAL',
@@ -70,7 +72,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetsBitAndGetsBitCount(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => "foobar",
@@ -95,7 +97,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetBitAndBitOp(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'VAL_1' => 1,
@@ -143,7 +145,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataAndGetBitPos(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.8.7', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => "\xff\xf0\x00",
@@ -168,7 +170,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndDecrData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -193,7 +195,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndDecrDataByNum(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -219,7 +221,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndGetRange(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.4.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'This is a string',
@@ -244,7 +246,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndGetSet(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VAL',
@@ -270,7 +272,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetBitAndGetBit(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -295,7 +297,8 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetBitFiledAndGetBit(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+       $this->checkRedisVersionedCommand($redis, '3.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -317,7 +320,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndIncrData(RedisInterface $redis)
     {
-        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -342,7 +345,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndIncrDataByNum(RedisInterface $redis)
     {
-        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -367,7 +370,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndIncrByFloat(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -392,7 +395,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetExAndSetNx(RedisInterface $redis)
     {
-        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        $this->checkRedisVersionedCommand($redis, '2.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VALUE',
@@ -419,7 +422,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetRange(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'Hello World',
@@ -445,7 +448,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_pSetExData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -472,7 +475,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_mGetData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'VAL_1' => 'INPUT_VAL_1',
@@ -503,7 +506,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_mSetData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.1', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'VAL_1' => 'INPUT_VAL_1',
@@ -536,7 +539,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_mSetNxData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.1', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'VAL_1' => 'INPUT_VAL_1',
@@ -569,7 +572,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_GetStringLength(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VAL',
@@ -594,7 +597,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndDelData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -619,7 +622,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndDumpData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -644,7 +647,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataAndCountExists(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'VAL_1' => 1,
@@ -674,7 +677,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndExpireData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -699,7 +702,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndExpireDataAtTime(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -725,7 +728,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataExpireAndPersist(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.2.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -750,7 +753,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndPExpireData(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -777,7 +780,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetAndPExpireDataAtTime(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -804,7 +807,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetStringAndGetDataType(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'string',
@@ -829,7 +832,8 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_Wait(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+       $this->checkRedisVersionedCommand($redis, '3.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -853,7 +857,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataAndGetRandomKey(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -878,7 +882,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataAndRenameKey(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'NEW_KEY' => 'NEW_INPUT_KEY',
@@ -906,7 +910,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_SetDataAndRanameKeyNx(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
@@ -932,7 +936,7 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_Restore(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+       $this->checkRedisVersionedCommand($redis, '2.6.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 'INPUT_VAL',
@@ -961,20 +965,18 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_Move(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
@@ -986,20 +988,18 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_Scan(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
     }
@@ -1010,22 +1010,49 @@ class RedisApiKeyValTest extends TModule
      */
     public function testRedis_Sort(RedisInterface $redis)
     {
-       $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+       $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY' => 'INPUT_KEY',
                 'VAL' => 1,
             ];
             return Promise::doResolve()
                 ->then(function() use($params, $redis) {
-                    // return $redis->setBit($params['KEY'], 0, 1);
                 })
                 ->then(function() use($params, $redis) {
-                    // return $redis->getBit($params['KEY'], 0);
                 })
                 ->then(function($value) use($params) {
-                    // $this->assertSame($value, $params['VAL']);
                 });
         }); 
+    }
+    
+    /**
+     * @group passed
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_SetAndTouchData(RedisInterface $redis)
+    {
+        //TODO: Implementation
+        $this->checkRedisVersionedCommand($redis, '3.2.1', function(RedisInterface $redis) {
+            $params = [
+                'KEY_1' => 'INPUT_KEY_1',
+                'KEY_2' => 'INPUT_KEY_2',
+            ];
+            return Promise::doResolve()
+                ->then(function() use($params, $redis) {
+                    $redis->set($params['KEY_1'], 0);
+                    $redis->set($params['KEY_2'], 0);
+
+                    return 0;
+                })
+                ->then(function() use($params, $redis) {
+                    return $redis->touch($params['KEY_1'], $params['KEY_2']);
+                })
+                ->then(function($value) use($params) {
+                    $this->assertSame($value, 2);
+                });
+        });
     }
 
     /**
@@ -1033,9 +1060,10 @@ class RedisApiKeyValTest extends TModule
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
-    public function testRedis_TouchAndUnLink(RedisInterface $redis)
+    public function testRedis_SetAndUnLinkData(RedisInterface $redis)
     {
-        $this->checkRedisCommand($redis, function(RedisInterface $redis) {
+        //TODO: Implementation
+        $this->checkRedisVersionedCommand($redis, '4.0.0', function(RedisInterface $redis) {
             $params = [
                 'KEY_1' => 'INPUT_KEY_1',
                 'KEY_2' => 'INPUT_KEY_2',
