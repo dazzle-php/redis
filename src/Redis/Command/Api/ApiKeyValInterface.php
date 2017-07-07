@@ -31,7 +31,7 @@ interface ApiKeyValInterface
      * @param ...$param
      * @return mixed
      */
-    public function bitField($key, $subCommand = null, ...$param);
+    public function bitField($key, $subCommand, ...$param);
 
     /**
      * @doc https://redis.io/commands/bitop

@@ -42,28 +42,30 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function bitField($key, $subCommand = null, ...$param)
+    public function bitField($key, $subCommand, ...$param)
     {
         $command = Enum::BITFIELD;
-        switch ($subCommand = strtoupper($subCommand)) {
+        $subCommand = strtoupper($subCommand);
+        //TODO: control flow improvement
+        switch ($subCommand) {
             case 'GET' : {
-                list ($type, $offset) = $param;
-                $args = [$subCommand, $type, $offset];
+                @list ($type, $offset) = $param;
+                $args = [$key, $subCommand, $type, $offset];
                 break;
             }
             case 'SET' : {
-                list ($type, $offset, $value) = $param;
-                $args = [$subCommand, $type, $offset, $value];
+                @list ($type, $offset, $value) = $param;
+                $args = [$key, $subCommand, $type, $offset, $value];
                 break;
             }
             case 'INCRBY' : {
-                list ($type, $offset, $increment) = $param;
-                $args = [$type, $offset, $increment];
+                @list ($type, $offset, $increment) = $param;
+                $args = [$key, $type, $offset, $increment];
                 break;
             }
             case 'OVERFLOW' : {
-                list ($behavior) = $param;
-                $args = [$subCommand, $behavior];
+                @list ($behavior) = $param;
+                $args = [$key, $subCommand, $behavior];
                 break;
             }
             default : {
@@ -71,7 +73,6 @@ trait ApiKeyValTrait
                 break;
             }
         }
-        $args = array_filter($args);
 
         return $this->dispatch(Builder::build($command, $args));
     }
