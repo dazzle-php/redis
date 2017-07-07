@@ -21,20 +21,21 @@ interface ApiKeyValInterface
      * @param int $end
      * @return mixed
      */
-    public function bitCount($key, $start=0, $end=0);
+    public function bitCount($key, $start=0, $end=-1);
 
     /**
      * @doc https://redis.io/commands/bitfield
      * @since 3.2.0
-     * @param $command
      * @param $key
+     * @param $subCommand
      * @param ...$param
      * @return mixed
      */
-    public function bitField($command, $key, ...$param);
+    public function bitField($key, $subCommand, ...$param);
 
     /**
-     * @doc
+     * @doc https://redis.io/commands/bitop
+     * @since 2.6.0
      * @param $operation
      * @param $dstKey
      * @param $srcKey
@@ -52,7 +53,7 @@ interface ApiKeyValInterface
      * @param int $end
      * @return mixed
      */
-    public function bitPos($key, $bit, $start=0, $end=0);
+    public function bitPos($key, $bit, $start=0, $end=-1);
 
     /**
      * @doc https://redis.io/commands/decr
@@ -199,7 +200,7 @@ interface ApiKeyValInterface
      * @param ...$values
      * @return mixed
      */
-    public function mGet($key, ...$values);
+    public function mGet($key, ...$keys);
 
     /**
      * @doc https://redis.io/commands/mset
@@ -290,10 +291,10 @@ interface ApiKeyValInterface
      * @doc https://redis.io/commands/pexpireat
      * @since 2.6.0
      * @param $key
-     * @param $milliseconds
+     * @param $milTimestamp
      * @return mixed
      */
-    public function pExpireAt($key, $milliseconds);
+    public function pExpireAt($key, $milTimestamp);
 
     /**
      * @doc https://redis.io/commands/touch

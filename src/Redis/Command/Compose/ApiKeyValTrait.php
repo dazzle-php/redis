@@ -30,7 +30,7 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function bitCount($key, $start = 0, $end = 0)
+    public function bitCount($key, $start = 0, $end = -1)
     {
         $command = Enum::BITCOUNT;
         $args = [$key, $start, $end];
@@ -42,28 +42,30 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function bitField($key, $subCommand = null, ...$param)
+    public function bitField($key, $subCommand, ...$param)
     {
         $command = Enum::BITFIELD;
-        switch ($subCommand = strtoupper($subCommand)) {
+        $subCommand = strtoupper($subCommand);
+        //TODO: control flow improvement
+        switch ($subCommand) {
             case 'GET' : {
-                list ($type, $offset) = $param;
-                $args = [$subCommand, $type, $offset];
+                @list ($type, $offset) = $param;
+                $args = [$key, $subCommand, $type, $offset];
                 break;
             }
             case 'SET' : {
-                list ($type, $offset, $value) = $param;
-                $args = [$subCommand, $type, $offset, $value];
+                @list ($type, $offset, $value) = $param;
+                $args = [$key, $subCommand, $type, $offset, $value];
                 break;
             }
             case 'INCRBY' : {
-                list ($type, $offset, $increment) = $param;
-                $args = [$type, $offset, $increment];
+                @list ($type, $offset, $increment) = $param;
+                $args = [$key, $type, $offset, $increment];
                 break;
             }
             case 'OVERFLOW' : {
-                list ($behavior) = $param;
-                $args = [$subCommand, $behavior];
+                @list ($behavior) = $param;
+                $args = [$key, $subCommand, $behavior];
                 break;
             }
             default : {
@@ -71,7 +73,6 @@ trait ApiKeyValTrait
                 break;
             }
         }
-        $args = array_filter($args);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -93,7 +94,7 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function bitPos($key, $bit, $start = 0, $end = 0)
+    public function bitPos($key, $bit, $start = 0, $end = -1)
     {
         $command = Enum::BITPOS;
         $args = [$key, $bit, $start, $end];
@@ -107,7 +108,6 @@ trait ApiKeyValTrait
      */
     public function decr($key)
     {
-        // TODO: Implement decr() method.
         $command = Enum::DECR;
         $args = [$key];
 
@@ -120,7 +120,6 @@ trait ApiKeyValTrait
      */
     public function decrBy($key, $decrement)
     {
-        // TODO: Implement decrBy() method.
         $command = Enum::DECRBY;
         $args = [$key, $decrement];
 
@@ -145,7 +144,6 @@ trait ApiKeyValTrait
      */
     public function getBit($key, $offset)
     {
-        // TODO: Implement getBit() method.
         $command = Enum::GETBIT;
         $args = [$key, $offset];
 
@@ -158,7 +156,6 @@ trait ApiKeyValTrait
      */
     public function getRange($key, $start, $end)
     {
-        // TODO: Implement getRange() method.
         $command = Enum::GETRANGE;
         $args = [$key, $start, $end];
 
@@ -171,7 +168,6 @@ trait ApiKeyValTrait
      */
     public function getSet($key, $value)
     {
-        // TODO: Implement getSet() method.
         $command = Enum::GETSET;
         $args = [$key, $value];
 
@@ -196,7 +192,6 @@ trait ApiKeyValTrait
      */
     public function incrBy($key, $increment)
     {
-        // TODO: Implement incrBy() method.
         $command = Enum::INCRBY;
         $args = [$key, $increment];
 
@@ -209,7 +204,6 @@ trait ApiKeyValTrait
      */
     public function incrByFloat($key, $increment)
     {
-        // TODO: Implement incrByFloat() method.
         $command = Enum::INCRBYFLOAT;
         $args = [$key, $increment];
 
@@ -235,7 +229,6 @@ trait ApiKeyValTrait
      */
     public function setBit($key, $offset, $value)
     {
-        // TODO: Implement setBit() method.
         $command = Enum::SETBIT;
         $args = [$key, $offset, $value];
 
@@ -294,12 +287,11 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function mGet($key, ...$values)
+    public function mGet($key, ...$keys)
     {
-        // TODO: Implement mGet() method.
         $command = Enum::MGET;
         $args = [$key];
-        $args = array_merge($args, $values);
+        $args = array_merge($args, $keys);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -310,9 +302,14 @@ trait ApiKeyValTrait
      */
     public function mSet(array $kvMap)
     {
-        // TODO: Implement mSet() method.
         $command = Enum::MSET;
-        $args = $kvMap;
+        $args = [];
+        if (!empty($kvMap)) {
+            foreach ($kvMap as $key => $val) {
+                $args[] = $key;
+                $args[] = $val;
+            }
+        }
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -323,9 +320,14 @@ trait ApiKeyValTrait
      */
     public function mSetNx($kvMap)
     {
-        // TODO: Implement mSetNx() method.
         $command = Enum::MSETNX;
-        $args = $kvMap;
+        $args = [];
+        if (!empty($kvMap)) {
+            foreach ($kvMap as $key => $val) {
+                $args[] = $key;
+                $args[] = $val;
+            }
+        }
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -336,7 +338,6 @@ trait ApiKeyValTrait
      */
     public function strLen($key)
     {
-        // TODO: Implement strLen() method.
         $command = Enum::STRLEN;
         $args = [$key];
 
@@ -375,7 +376,6 @@ trait ApiKeyValTrait
      */
     public function exists($key, ...$keys)
     {
-        // TODO: Implement exists() method.
         $command = Enum::EXISTS;
         $args = [$key];
         $args = array_merge($args, $keys);
@@ -389,7 +389,6 @@ trait ApiKeyValTrait
      */
     public function expire($key, $seconds)
     {
-        // TODO: Implement expire() method.
         $command = Enum::EXPIRE;
         $args = [$key, $seconds];
 
@@ -402,7 +401,6 @@ trait ApiKeyValTrait
      */
     public function expireAt($key, $timestamp)
     {
-        // TODO: Implement expireAt() method.
         $command = Enum::EXPIREAT;
         $args = [$key, $timestamp];
 
@@ -427,7 +425,6 @@ trait ApiKeyValTrait
      */
     public function pExpire($key, $milliseconds)
     {
-        // TODO: Implement pExpire() method.
         $command = Enum::PEXPIRE;
         $args = [$key, $milliseconds];
 
@@ -438,11 +435,10 @@ trait ApiKeyValTrait
      * @override
      * @inheritDoc
      */
-    public function pExpireAt($key, $milliseconds)
+    public function pExpireAt($key, $milTimestamp)
     {
-        // TODO: Implement pExpireAt() method.
         $command = Enum::PEXPIREAT;
-        $args = [$key, $milliseconds];
+        $args = [$key, $milTimestamp];
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -466,7 +462,6 @@ trait ApiKeyValTrait
      */
     public function ttl($key)
     {
-        // TODO: Implement ttl() method.
         $command = Enum::TTL;
         $args = [$key];
 
@@ -517,7 +512,6 @@ trait ApiKeyValTrait
      */
     public function randomKey()
     {
-        // TODO: Implement randomKey() method.
         $command = Enum::RANDOMKEY;
 
         return $this->dispatch(Builder::build($command));
@@ -553,7 +547,6 @@ trait ApiKeyValTrait
      */
     public function restore($key, $ttl, $value)
     {
-        // TODO: Implement restore() method.
         $command = Enum::RESTORE;
         $args = [$key, $ttl, $value];
 
