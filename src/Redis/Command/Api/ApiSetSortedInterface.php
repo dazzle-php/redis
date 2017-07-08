@@ -9,9 +9,10 @@ interface ApiSetSortedInterface
      * @since 1.2.0
      * @param $key
      * @param array $options
+     * @param ...$scoreMembers
      * @return mixed
      */
-    public function zAdd($key, array $options = []);
+    public function zAdd($key, array $options = [], ...$scoreMembers);
 
     /**
      * @doc https://redis.io/commands/zcard
@@ -99,10 +100,12 @@ interface ApiSetSortedInterface
      * @param $key
      * @param $min
      * @param $max
-     * @param array $options
+     * @param bool $withScores
+     * @param integer $offset
+     * @param integer $count
      * @return mixed
      */
-    public function zRangeByScore($key, $min, $max, array $options = []);
+    public function zRangeByScore($key, $min, $max, $withScores = false, $offset = 0, $count = 0);
 
     /**
      * @doc https://redis.io/commands/zrank
@@ -158,10 +161,10 @@ interface ApiSetSortedInterface
      * @param $key
      * @param $start
      * @param $stop
-     * @param array $options
+     * @param bool $withScores
      * @return mixed
      */
-    public function zRevRange($key, $start, $stop, array $options = []);
+    public function zRevRange($key, $start, $stop, $withScores = false);
 
     /**
      * @doc https://redis.io/commands/zrevrangebyscore
@@ -169,10 +172,12 @@ interface ApiSetSortedInterface
      * @param $key
      * @param $max
      * @param $min
-     * @param array $options
+     * @param bool withScores
+     * @param integer $offset
+     * @param integer $count
      * @return mixed
      */
-    public function zRevRangeByScore($key, $max, $min, array $options = []);
+    public function zRevRangeByScore($key, $max, $min, $withScores = false, $offset = 0, $count = 0);
 
     /**
      * @doc https://redis.io/commands/zrevrank
