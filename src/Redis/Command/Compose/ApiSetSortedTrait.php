@@ -249,7 +249,7 @@ trait ApiSetSortedTrait
                 $len = is_array($value) ? count($value) : 0;
                 if ($len > 0) {
                     $ret = [];
-                    for ($i=0; $i<$len; $i+=1) {
+                    for ($i=0; $i<$len; $i+=2) {
                         $member = $value[$i];
                         $score = $value[$i+1];
                         $ret[$member] = $score;
