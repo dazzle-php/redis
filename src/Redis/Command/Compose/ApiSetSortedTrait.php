@@ -18,16 +18,10 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zAdd($key, array $options = [], array $scoreMembers = [])
+    public function zAdd($key, array $options = [], ...$scoreMembers)
     {
         $command = Enum::ZADD;
-        $args = array_merge([$key], $options);
-        if (!empty($scoreMembers)) {
-            foreach ($scoreMembers as $score => $member) {
-                $args[] = (float) $score;
-                $args[] = $member;
-            }
-        }
+        $args = array_merge([$key], $options, $scoreMembers);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -124,7 +118,7 @@ trait ApiSetSortedTrait
     {
         $command = Enum::ZRANGEBYLEX;
         $args = [$key, $min, $max];
-        $args = array_merge($args,$options);
+        $args = array_merge($args, $options);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -146,13 +140,33 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zRangeByScore($key, $min, $max, array $options = [])
+    public function zRangeByScore($key, $min, $max, $withScores = false, $offset = 0, $count = 0)
     {
         $command = Enum::ZRANGEBYSCORE;
-        $args = [$key, $min,$max];
-        $args = array_merge($args, $options);
+        $args = [$key, $min, $max];
+        if ($withScores === true) {
+            $args[] = 'WITHSCORES';
+        }
+        if ($offset != 0 || $count != 0) {
+            $args[] = 'LIMIT';
+            $args[] = $offset;
+            $args[] = $count;
+        }
+        $promise = $this->dispatch(Builder::build($command, $args));
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $withScores ? $promise->then(function ($value) {
+            $len = is_array($value) ? count($value) : 0;
+            if ($len > 0) {
+                $ret = [];
+                for ($i=0; $i<$len; $i+=2) {
+                    $ret[$value[$i]] = $value[$i+1];
+                }
+
+                return $ret;
+            }
+
+            return $value;
+        } ) : $promise;
     }
 
     /**
@@ -222,26 +236,66 @@ trait ApiSetSortedTrait
      * @override
      * @inheritDoc
      */
-    public function zRevRange($key, $start, $stop, array $options = [])
+    public function zRevRange($key, $start, $stop, $withScores = false)
     {
         $command = Enum::ZREVRANGE;
         $args = [$key, $start, $stop];
-        $args = array_merge($args, $options);
 
-        return $this->dispatch(Builder::build($command, $args));
+        if ($withScores === true) {
+            $args[] = 'WITHSCORES';
+            
+            return $this->dispatch(Builder::build($command, $args))
+            ->then(function ($value) {
+                $len = is_array($value) ? count($value) : 0;
+                if ($len > 0) {
+                    $ret = [];
+                    for ($i=0; $i<$len; $i+=2) {
+                        $member = $value[$i];
+                        $score = $value[$i+1];
+                        $ret[$member] = $score;
+                    }
+
+                    return $ret;
+                }
+
+                return $value; 
+            });
+        } 
+
+        return $promise = $this->dispatch(Builder::build($command, $args));
     }
 
     /**
      * @override
      * @inheritDoc
      */
-    public function zRevRangeByScore($key, $max, $min, array $options = [])
+    public function zRevRangeByScore($key, $max, $min, $withScores = false, $offset = 0, $count = 0)
     {
         $command = Enum::ZREVRANGEBYSCORE;
-        $args = [$key,$max,$min];
-        $args = array_merge($args, $options);
+        $args = [$key, $max, $min];
+        if ($withScores === true) {
+            $args[] = 'WITHSCORES';
+        }
+        if ($offset != 0 || $count != 0) {
+            $args[] = 'LIMIT';
+            $args[] = $offset;
+            $args[] = $count;
+        }
+        $promise = $this->dispatch(Builder::build($command, $args));
 
-        return $this->dispatch(Builder::build($command, $args));
+        return $withScores ? $promise->then(function ($value) {
+            $len = is_array($value) ? count($value) : 0;
+            if ($len > 0) {
+                $ret = [];
+                for ($i=0; $i<$len; $i+=2) {
+                    $ret[$value[$i]] = $value[$i+1];
+                }
+
+                return $ret;
+            }
+
+            return $value;
+        } ) : $promise;
     }
 
     /**
