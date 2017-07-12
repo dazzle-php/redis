@@ -55,9 +55,9 @@ trait ApiConnTrait
      */
     public function select($index)
     {
-        // TODO: Implement select() method.
         $command = Enum::SELECT;
+        $args = [$index];
 
-        return $this;
+        return $this->dispatch(Builder::build($command, $args));
     }
 }
