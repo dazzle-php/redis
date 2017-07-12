@@ -17,8 +17,74 @@ class RedisApiConnTest extends TModule
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
-    public function testRedis_(RedisInterface $redis)
+    public function testRedis_auth(RedisInterface $redis)
     {
-       
+        //TODO: Implementation
+         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
+             $params = [];
+
+             return Promise::doResolve()->then(function () use ($redis, $params) {});
+         });
+    }
+
+    /**
+     * @group passed
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_ping(RedisInterface $redis)
+    {
+         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
+             $params = [
+                 'MSG' => 'MESSAGE'
+             ];
+             
+             return Promise::doResolve()->then(function () use ($redis, $params) {
+                return $redis->ping($params['MSG']);
+             })
+             ->then(function ($value) use ($params) {
+                 $this->assertSame($value, $params['MSG']);
+             });
+         });
+    }
+
+    /**
+     * @group passed
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_quit(RedisInterface $redis)
+    {
+         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
+             $params = [];
+             
+             return Promise::doResolve()->then(function () use ($redis, $params) {
+                 return $redis->quit();
+             })
+             ->then(function ($value) {
+                 $this->assertSame($value, 'OK');
+             });
+         });
+    }
+
+    /**
+     * @group passed
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_select(RedisInterface $redis)
+    {
+         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
+             $params = [
+                 'INDEX' => 0,
+             ];
+             
+             return Promise::doResolve()->then(function () use ($redis, $params) {
+                 return $redis->select($params['INDEX']);
+             })
+             ->then(function ($value) {
+                 $this->assertSame($value, 'OK');
+             });
+         });
     }
 }
