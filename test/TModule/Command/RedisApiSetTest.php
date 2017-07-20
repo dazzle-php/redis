@@ -261,9 +261,9 @@ class RedisApiSetTest extends TModule
             return Promise::doResolve()->then(function () use ($redis) {
                 $params = [
                     'SET_1' => 'T_SET_1',
-                    'S1_E1' => 'T_S1_E1',
+                    'S1_E1' => '1',
                     'SET_2' => 'T_SET_2',
-                    'S2_E1' => 'T_S2_E1',
+                    'S2_E1' => '2',
                 ];
                 return Promise::doResolve()->then(function () use ($redis, $params) {
                     $redis->sAdd($params['SET_1'], $params['S1_E1']);
@@ -308,20 +308,6 @@ class RedisApiSetTest extends TModule
                 ->then(function ($value) {
                     $this->assertSame(2, $value);
                 });
-            });
-        });
-    }
-
-    /**
-     * @group ignored
-     * @dataProvider redisProvider
-     * @param RedisInterface $redis
-     */
-    public function testRedis_sWapBb(RedisInterface $redis)
-    {
-        $this->checkRedisVersionedCommand($redis, '4.0.0', function(RedisInterface $redis) {
-            return Promise::doResolve()->then(function () use ($redis) {
-                //TODO: remove this api from Set commands(wrong group)
             });
         });
     }

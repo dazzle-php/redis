@@ -60,4 +60,16 @@ trait ApiConnTrait
 
         return $this->dispatch(Builder::build($command, $args));
     }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function swapBb($opt, $dst)
+    {
+        $command = Enum::SWAPDB;
+        $args = [$opt, $dst];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
 }

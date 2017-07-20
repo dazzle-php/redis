@@ -77,6 +77,15 @@ interface ApiCoreInterface
     public function slaveOf($host, $port);
 
     /**
+     * @doc https://redis.io/commands/slowlog
+     * @since 2.2.12
+     * @param $command
+     * @param array $args
+     * @return mixed
+     */
+    public function slowLog($command, array $args=[]);
+
+    /**
      * @doc https://redis.io/commands/save
      * @since 1.0.0
      * @return mixed

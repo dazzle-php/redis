@@ -151,6 +151,19 @@ trait ApiCoreTrait
      * @override
      * @inheritDoc
      */
+    public function slowLog($command, array $args = [])
+    {
+        // TODO: Implement sLowLog() method.
+        $command = Enum::SLOWLOG;
+        $args = array_merge([$command],$args);
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
     public function save()
     {
         // TODO: Implement save() method.

@@ -137,7 +137,7 @@ class Enum implements EnumInterface
     const RPUSHX = 'RPUSHX';
     const SADD = 'SADD';
     const SAVE = 'SAVE';
-    const SCARD = 'SCART';
+    const SCARD = 'SCARD';
     const SCRIPT_DEBUG = 'SCRIPT DEBUG';
     const SCRIPT_EXISTS = 'SCRIPT EXISTS';
     const SCRIPT_FLUSH = 'SCRIPT FLUSH';
