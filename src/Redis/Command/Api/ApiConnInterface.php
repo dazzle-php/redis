@@ -34,4 +34,13 @@ interface ApiConnInterface
      * @return mixed
      */
     public function select($index);
+
+    /**
+     * @doc https://redis.io/commands/swapdb
+     * @since 4.0.0
+     * @param $opt
+     * @param $dst
+     * @return mixed
+     */
+    public function swapBb($opt, $dst);
 }

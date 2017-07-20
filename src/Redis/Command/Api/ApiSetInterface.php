@@ -31,15 +31,6 @@ interface ApiSetInterface
     public function sIsMember($key, $member);
 
     /**
-     * @doc https://redis.io/commands/slowlog
-     * @since 2.2.12
-     * @param $command
-     * @param array $args
-     * @return mixed
-     */
-    public function sLowLog($command, array $args=[]);
-
-    /**
      * @doc https://redis.io/commands/smembers
      * @since 1.0.0
      * @param $key
@@ -52,10 +43,10 @@ interface ApiSetInterface
      * @since 1.0.0
      * @param $src
      * @param $dst
-     * @param $members
+     * @param ...$members
      * @return mixed
      */
-    public function sMove($src, $dst, $members);
+    public function sMove($src, $dst, ...$members);
 
     /**
      * @doc https://redis.io/commands/spop
@@ -110,16 +101,6 @@ interface ApiSetInterface
      * @return mixed
      */
     public function sUnionStore($dst, ...$keys);
-
-    /**
-     * @doc https://redis.io/commands/swapdb
-     * @since 4.0.0
-     * @param $opt
-     * @param $dst
-     * @param ...$keys
-     * @return mixed
-     */
-    public function sWapBb($opt, $dst, ...$keys);
 
     /**
      * @doc https://redis.io/commands/sadd

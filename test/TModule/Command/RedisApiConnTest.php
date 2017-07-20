@@ -87,4 +87,21 @@ class RedisApiConnTest extends TModule
              });
          });
     }
+
+    /**
+     * @group ignored
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_swapBb(RedisInterface $redis)
+    {
+        $this->checkRedisVersionedCommand($redis, '4.0.0', function(RedisInterface $redis) {
+            return Promise::doResolve()->then(function () use ($redis) {
+                return $redis->swapBb(0, 1);
+            })
+            ->then(function ($value) {
+                $this->assertSame('OK', $value);
+            });
+        });
+    }
 }
