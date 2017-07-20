@@ -274,8 +274,8 @@ class RedisApiSetTest extends TModule
                 })
                 ->then(function ($value) use ($params) {
                     $this->assertSame([
-                        $params['SET_1'],
-                        $params['SET_2'],
+                        $params['S1_E1'],
+                        $params['S2_E1'],
                     ], $value);
                 });
             });
@@ -399,7 +399,6 @@ class RedisApiSetTest extends TModule
                 ->then(function ($value) use ($params) {
                     $this->assertSame([
                         $params['S1_E1'],
-                        $params['S2_E1'],
                     ], $value);
                 });
             });
@@ -430,7 +429,7 @@ class RedisApiSetTest extends TModule
                     return $redis->sDiffStore($params['SET_3'], $params['SET_1'], $params['SET_2']);
                 })
                 ->then(function ($value) use ($params) {
-                    $this->assertSame(2, $value);
+                    $this->assertSame(1, $value);
                 });
             });
         });
