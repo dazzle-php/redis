@@ -145,8 +145,8 @@ class RedisApiSetTest extends TModule
                     'S2_E1' => 'T_S2_E1',
                 ];
                 return Promise::doResolve()->then(function () use ($redis, $params) {
-                    $redis->sAdd($params['SET_1'], $params['S1_E1'], $params['INTER']);
-                    $redis->sAdd($params['SET_2'], $params['S2_E1'], $params['INTER']);
+                    $redis->sAdd($params['SET_1'], $params['S1_E1']);
+                    $redis->sAdd($params['SET_2'], $params['S2_E1']);
                 })
                 ->then(function () use ($redis, $params) {
                     return $redis->sMove($params['SET_1'], $params['SET_2'], $params['S1_E1']);
@@ -259,7 +259,25 @@ class RedisApiSetTest extends TModule
     {
         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             return Promise::doResolve()->then(function () use ($redis) {
-
+                $params = [
+                    'SET_1' => 'T_SET_1',
+                    'S1_E1' => 'T_S1_E1',
+                    'SET_2' => 'T_SET_2',
+                    'S2_E1' => 'T_S2_E1',
+                ];
+                return Promise::doResolve()->then(function () use ($redis, $params) {
+                    $redis->sAdd($params['SET_1'], $params['S1_E1']);
+                    $redis->sAdd($params['SET_2'], $params['S2_E1']);
+                })
+                ->then(function () use ($redis, $params) {
+                    return $redis->sUnion($params['SET_1'], $params['SET_2']);
+                })
+                ->then(function ($value) use ($params) {
+                    $this->assertSame([
+                        $params['SET_1'],
+                        $params['SET_2'],
+                    ], $value);
+                });
             });
         });
     }
@@ -273,7 +291,23 @@ class RedisApiSetTest extends TModule
     {
         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             return Promise::doResolve()->then(function () use ($redis) {
-
+                $params = [
+                    'SET_1' => 'T_SET_1',
+                    'S1_E1' => 'T_S1_E1',
+                    'SET_2' => 'T_SET_2',
+                    'S2_E1' => 'T_S2_E1',
+                    'SET_3' => 'T_SET_3',
+                ];
+                return Promise::doResolve()->then(function () use ($redis, $params) {
+                    $redis->sAdd($params['SET_1'], $params['S1_E1']);
+                    $redis->sAdd($params['SET_2'], $params['S2_E1']);
+                })
+                ->then(function () use ($redis, $params) {
+                    return $redis->sUnionStore($params['SET_3'], $params['SET_1'], $params['SET_2']);
+                })
+                ->then(function ($value) {
+                    $this->assertSame(2, $value);
+                });
             });
         });
     }
@@ -324,7 +358,18 @@ class RedisApiSetTest extends TModule
     {
         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             return Promise::doResolve()->then(function () use ($redis) {
+                $params = [
+                    'SET' => 'T_SET',
+                    'E_1' => 'T_E_1',
+                ];
+                return Promise::doResolve()->then(function () use ($redis, $params) {
+                    $redis->sAdd($params['SET'], $params['E_1']);
 
+                    return $redis->sCard($params['SET']);
+                })
+                ->then(function ($value) use ($params) {
+                    $this->assertSame(1, $value);
+                });
             });
         });
     }
@@ -338,7 +383,25 @@ class RedisApiSetTest extends TModule
     {
         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             return Promise::doResolve()->then(function () use ($redis) {
-
+                $params = [
+                    'SET_1' => 'T_SET_1',
+                    'S1_E1' => 'T_S1_E1',
+                    'SET_2' => 'T_SET_2',
+                    'S2_E1' => 'T_S2_E1',
+                ];
+                return Promise::doResolve()->then(function () use ($redis, $params) {
+                    $redis->sAdd($params['SET_1'], $params['S1_E1']);
+                    $redis->sAdd($params['SET_2'], $params['S2_E1']);
+                })
+                ->then(function () use ($redis, $params) {
+                    return $redis->sDiff($params['SET_1'], $params['SET_2']);
+                })
+                ->then(function ($value) use ($params) {
+                    $this->assertSame([
+                        $params['S1_E1'],
+                        $params['S2_E1'],
+                    ], $value);
+                });
             });
         });
     }
@@ -352,7 +415,23 @@ class RedisApiSetTest extends TModule
     {
         $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
             return Promise::doResolve()->then(function () use ($redis) {
-
+                $params = [
+                    'SET_1' => 'T_SET_1',
+                    'S1_E1' => 'T_S1_E1',
+                    'SET_2' => 'T_SET_2',
+                    'S2_E1' => 'T_S2_E1',
+                    'SET_3' => 'T_SET_3',
+                ];
+                return Promise::doResolve()->then(function () use ($redis, $params) {
+                    $redis->sAdd($params['SET_1'], $params['S1_E1']);
+                    $redis->sAdd($params['SET_2'], $params['S2_E1']);
+                })
+                ->then(function () use ($redis, $params) {
+                    return $redis->sDiffStore($params['SET_3'], $params['SET_1'], $params['SET_2']);
+                })
+                ->then(function ($value) use ($params) {
+                    $this->assertSame(2, $value);
+                });
             });
         });
     }
