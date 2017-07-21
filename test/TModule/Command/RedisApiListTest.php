@@ -3,7 +3,6 @@
 namespace Dazzle\Redis\Test\TModule\Command;
 
 use Dazzle\Promise\Promise;
-use Dazzle\Redis\Redis;
 use Dazzle\Redis\RedisInterface;
 use Dazzle\Redis\Test\TModule;
 use Dazzle\Redis\Test\TModule\_Support\RedisTrait;
