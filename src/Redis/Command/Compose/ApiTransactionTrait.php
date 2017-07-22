@@ -20,8 +20,18 @@ trait ApiTransactionTrait
      */
     public function discard()
     {
-        // TODO: Implement discard() method.
         $command = Enum::DISCARD;
+
+        return $this->dispatch(Builder::build($command));
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function exec()
+    {
+        $command = Enum::EXEC;
 
         return $this->dispatch(Builder::build($command));
     }
@@ -32,7 +42,6 @@ trait ApiTransactionTrait
      */
     public function multi()
     {
-        // TODO: Implement multi() method.
         $command = Enum::MULTI;
 
         return $this->dispatch(Builder::build($command));
@@ -44,7 +53,6 @@ trait ApiTransactionTrait
      */
     public function unWatch()
     {
-        // TODO: Implement unWatch() method.
         $command = Enum::UNWATCH;
 
         return $this->dispatch(Builder::build($command));
@@ -56,7 +64,6 @@ trait ApiTransactionTrait
      */
     public function watch($key, ...$keys)
     {
-        // TODO: Implement watch() method.
         $command = Enum::WATCH;
         $args = [$key];
         $args = array_merge($args, $keys);

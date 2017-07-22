@@ -12,6 +12,13 @@ interface ApiTransactionInterface
     public function discard();
 
     /**
+     * @doc https://redis.io/commands/exec
+     * @since 1.2.0
+     * @return mixed
+     */
+    public function exec();
+
+    /**
      * @doc https://redis.io/commands/multi
      * @since 1.2.0
      * @return mixed

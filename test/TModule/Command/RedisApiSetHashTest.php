@@ -12,7 +12,7 @@ class RedisApiSetHashTest extends TModule
     use RedisTrait;
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -36,7 +36,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -64,7 +64,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -88,7 +88,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -121,7 +121,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -145,7 +145,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -169,7 +169,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -202,7 +202,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -232,7 +232,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -265,7 +265,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -293,7 +293,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -315,7 +315,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -347,7 +347,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -371,7 +371,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
@@ -404,7 +404,7 @@ class RedisApiSetHashTest extends TModule
     }
 
     /**
-     * @group testing
+     * @group passed
      * @dataProvider redisProvider
      * @param RedisInterface $redis
      */
