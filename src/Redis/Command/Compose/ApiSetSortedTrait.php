@@ -68,7 +68,6 @@ trait ApiSetSortedTrait
      */
     public function zInterStore($dst, $numKeys)
     {
-        // TODO: Implement zInterStore() method.
         $command = Enum::ZINTERSTORE;
         $args = [$dst, $numKeys];
 
@@ -328,7 +327,6 @@ trait ApiSetSortedTrait
      */
     public function zScan($key, $cursor, array $options = [])
     {
-        // TODO: Implement zScan() method.
         $command = Enum::ZSCAN;
         $args = [$key , $cursor];
         $args = array_merge($args, $options);
@@ -341,7 +339,6 @@ trait ApiSetSortedTrait
      */
     public function zUnionScore($dst, $numKeys)
     {
-        // TODO: Implement zUnionScore() method.
         $command = Enum::ZUNIIONSCORE;
         $args = [$dst, $numKeys];
 
