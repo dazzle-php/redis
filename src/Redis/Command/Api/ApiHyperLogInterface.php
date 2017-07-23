@@ -5,15 +5,6 @@ namespace Dazzle\Redis\Command\Api;
 interface ApiHyperLogInterface
 {
     /**
-     * @doc https://redis.io/commands/append
-     * @since 2.0.0
-     * @param $key
-     * @param $value
-     * @return mixed
-     */
-    public function append($key, $value);
-
-    /**
      * @doc https://redis.io/commands/pfadd
      * @since 2.8.9
      * @param $key
@@ -33,8 +24,9 @@ interface ApiHyperLogInterface
     /**
      * @doc https://redis.io/commands/pfmerge
      * @since 2.8.9
-     * @param array $dsKeyMap
+     * @param $dstKey
+     * @param ...$srcKeys
      * @return mixed
      */
-    public function pFMerge(array $dsKeyMap);
+    public function pFMerge($dstKey, ...$srcKeys);
 }

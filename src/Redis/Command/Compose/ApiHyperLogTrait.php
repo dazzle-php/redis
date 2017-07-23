@@ -20,7 +20,6 @@ trait ApiHyperLogTrait
      */
     public function pFAdd($key, ...$elements)
     {
-        // TODO: Implement pFAdd() method.
         $command = Enum::PFADD;
         $args = [$key];
         $args = array_merge($args, $elements);
@@ -34,7 +33,6 @@ trait ApiHyperLogTrait
      */
     public function pFCount(...$keys)
     {
-        // TODO: Implement pFCount() method.
         $command = Enum::PFCOUNT;
         $args = $keys;
 
@@ -45,11 +43,10 @@ trait ApiHyperLogTrait
      * @override
      * @inheritDoc
      */
-    public function pFMerge(array $dsKeyMap)
+    public function pFMerge($dstKey, ...$srcKeys)
     {
-        // TODO: Implement pFMerge() method.
         $command = Enum::PFMERGE;
-        $args = $dsKeyMap;
+        $args = array_merge([$dstKey], $srcKeys);
 
         return $this->dispatch(Builder::build($command, $args));
     }
