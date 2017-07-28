@@ -79,11 +79,11 @@ interface ApiCoreInterface
     /**
      * @doc https://redis.io/commands/slowlog
      * @since 2.2.12
-     * @param $command
+     * @param $subCommand
      * @param array $args
      * @return mixed
      */
-    public function slowLog($command, array $args=[]);
+    public function slowLog($subCommand, array $args=[]);
 
     /**
      * @doc https://redis.io/commands/save

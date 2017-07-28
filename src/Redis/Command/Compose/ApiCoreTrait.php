@@ -42,7 +42,6 @@ trait ApiCoreTrait
      */
     public function sync()
     {
-        // TODO: Implement sync() method.
         $command = Enum::SYNC;
 
         return $this->dispatch(Builder::build($command));
@@ -54,7 +53,6 @@ trait ApiCoreTrait
      */
     public function time()
     {
-        // TODO: Implement time() method.
         $command = Enum::TIME;
 
         return $this->dispatch(Builder::build($command));
@@ -66,7 +64,6 @@ trait ApiCoreTrait
      */
     public function monitor()
     {
-        // TODO: Implement monitor() method.
         $command = Enum::MONITOR;
 
         return $this->dispatch(Builder::build($command));
@@ -89,7 +86,6 @@ trait ApiCoreTrait
      */
     public function flushDb()
     {
-        // TODO: Implement flushDb() method.
         $command = Enum::FLUSHDB;
 
         return $this->dispatch(Builder::build($command));
@@ -140,7 +136,6 @@ trait ApiCoreTrait
      */
     public function slaveOf($host, $port)
     {
-        // TODO: Implement slaveOf() method.
         $command = Enum::SLAVEOF;
         $args = [$host, $port];
 
@@ -151,11 +146,10 @@ trait ApiCoreTrait
      * @override
      * @inheritDoc
      */
-    public function slowLog($command, array $args = [])
+    public function slowLog($subCommand, array $args = [])
     {
-        // TODO: Implement sLowLog() method.
         $command = Enum::SLOWLOG;
-        $args = array_merge([$command],$args);
+        $args = array_merge([$subCommand],$args);
 
         return $this->dispatch(Builder::build($command, $args));
     }
@@ -166,7 +160,6 @@ trait ApiCoreTrait
      */
     public function save()
     {
-        // TODO: Implement save() method.
         $command = Enum::SAVE;
 
         return $this->dispatch(Builder::build($command));
