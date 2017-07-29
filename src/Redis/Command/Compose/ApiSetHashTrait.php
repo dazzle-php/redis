@@ -212,7 +212,6 @@ trait ApiSetHashTrait
      */
     public function hExists($key, $field)
     {
-        // TODO: Implement hExists() method.
         $command = Enum::HEXISTS;
         $args = [$key, $field];
 
