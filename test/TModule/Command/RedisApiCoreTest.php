@@ -204,7 +204,7 @@ class RedisApiCoreTest extends TModule
                 return $redis->slaveOf('127.0.0.1',6379);
             })
             ->then(function ($value) use ($redis) {
-                $redis->readWrite();
+                $redis->slaveOf('no', 'one');
                 $this->assertSame('OK', $value);
             });
         });
