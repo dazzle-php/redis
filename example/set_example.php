@@ -3,7 +3,6 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dazzle\Loop\Model\SelectLoop;
 use Dazzle\Loop\Loop;
-use Dazzle\Promise\Promise;
 use Dazzle\Redis\Redis;
 
 $loop = new Loop(new SelectLoop());
