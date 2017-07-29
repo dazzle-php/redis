@@ -302,6 +302,7 @@ trait ApiKeyValTrait
      */
     public function mSet(array $kvMap)
     {
+        //TODO: change the param $kvMap to ...$kv,cauz map not allow duplicate key
         $command = Enum::MSET;
         $args = [];
         if (!empty($kvMap)) {
@@ -363,7 +364,6 @@ trait ApiKeyValTrait
      */
     public function dump($key)
     {
-        // TODO: Implement dump() method.
         $command = Enum::DUMP;
         $args = [$key];
 
@@ -499,7 +499,6 @@ trait ApiKeyValTrait
      */
     public function wait($numSlaves, $timeout)
     {
-        // TODO: Implement wait() method.
         $command = Enum::WAIT;
         $args = [$numSlaves, $timeout];
 
@@ -571,7 +570,6 @@ trait ApiKeyValTrait
      */
     public function move($key, $db)
     {
-        // TODO: Implement move() method.
         $command = Enum::MOVE;
         $args = [$key, $db];
 
@@ -597,7 +595,6 @@ trait ApiKeyValTrait
      */
     public function sort($key, array $options = [])
     {
-        // TODO: Implement sort() method.
         $command = Enum::SORT;
         $args = [$key];
         $args = array_merge($args, $options);

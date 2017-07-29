@@ -43,10 +43,10 @@ interface ApiSetInterface
      * @since 1.0.0
      * @param $src
      * @param $dst
-     * @param ...$members
+     * @param $member
      * @return mixed
      */
-    public function sMove($src, $dst, ...$members);
+    public function sMove($src, $dst, $member);
 
     /**
      * @doc https://redis.io/commands/spop

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Dazzle\Loop\Model\SelectLoop;
 use Dazzle\Loop\Loop;
 use Dazzle\Redis\Redis;
+
 //create a global loop
 $loop = new Loop(new SelectLoop());
 //create a new redis client

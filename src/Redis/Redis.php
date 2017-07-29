@@ -140,8 +140,6 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $this->isConnected = true;
         $this->isBeingDisconnected = false;
         $this->stream = $stream;
-
-        // TODO patch missing pub/sub, pipeline, auth
         $this->handleStart();
         $this->emit('start', [ $this ]);
 
@@ -171,8 +169,6 @@ class Redis extends BaseEventEmitter implements RedisInterface
         }
 
         $this->reqs = [];
-
-         // TODO patch missing pub/sub, pipeline, auth
         $this->handleStop();
         $this->emit('stop', [ $this ]);
 

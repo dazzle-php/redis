@@ -20,7 +20,6 @@ trait ApiListTrait
      */
     public function blPop(array $keys, $timeout)
     {
-        // TODO: Implement blPop() method.
         $command = Enum::BLPOP;
         $keys[] = $timeout;
         $args = $keys;
@@ -47,7 +46,6 @@ trait ApiListTrait
      */
     public function brPop(array $keys, $timeout)
     {
-        // TODO: Implement brPop() method.
         $command = Enum::BRPOP;
         $keys[] = $timeout;
         $args = $keys;
@@ -74,7 +72,6 @@ trait ApiListTrait
      */
     public function brPopLPush($src, $dst, $timeout)
     {
-        // TODO: Implement brPopLPush() method.
         $command = Enum::BRPOPLPUSH;
         $args = [$src, $dst, $timeout];
 
@@ -87,7 +84,6 @@ trait ApiListTrait
      */
     public function lIndex($key, $index)
     {
-        // TODO: Implement lIndex() method.
         $command = Enum::LINDEX;
         $args = [$key, $index];
 
@@ -100,7 +96,6 @@ trait ApiListTrait
      */
     public function lInsert($key, $action, $pivot, $value)
     {
-        // TODO: Implement lInsert() method.
         $command = Enum::LINSERT;
         $args = [$key, $action, $pivot, $value];
 
@@ -113,7 +108,6 @@ trait ApiListTrait
      */
     public function lLen($key)
     {
-        // TODO: Implement lLen() method.
         $command = Enum::LLEN;
         $args = [$key];
 
@@ -126,7 +120,6 @@ trait ApiListTrait
      */
     public function lPop($key)
     {
-        // TODO: Implement lPop() method.
         $command = Enum::LPOP;
         $args = [$key];
 
@@ -171,7 +164,6 @@ trait ApiListTrait
      */
     public function lRem($key, $count, $value)
     {
-        // TODO: Implement lRem() method.
         $command = Enum::LREM;
         $args = [$key, $count, $value];
 
@@ -184,7 +176,6 @@ trait ApiListTrait
      */
     public function lSet($key, $index, $value)
     {
-        // TODO: Implement lSet() method.
         $command = Enum::LSET;
         $args = [$key, $index, $value];
 
@@ -197,7 +188,6 @@ trait ApiListTrait
      */
     public function lTrim($key, $start, $stop)
     {
-        // TODO: Implement lTrim() method.
         $command = Enum::LTRIM;
         $args = [$key, $start, $stop];
 
@@ -222,7 +212,6 @@ trait ApiListTrait
      */
     public function rPopLPush($src, $dst)
     {
-        // TODO: Implement rPopLPush() method.
         $command = Enum::RPOPLPUSH;
         $args = [$src, $dst];
 
