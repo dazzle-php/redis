@@ -131,6 +131,7 @@ trait ApiSetHashTrait
      */
     public function hMSet($key, array $fvMap)
     {
+        //TODO: replace param $fvMap to ...$fvs,cauz hash map not allow duplicate key
         $command = Enum::HMSET;
         $args = [$key];
         if (!empty($fvMap)) {

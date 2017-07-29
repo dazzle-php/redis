@@ -302,6 +302,7 @@ trait ApiKeyValTrait
      */
     public function mSet(array $kvMap)
     {
+        //TODO: change the param $kvMap to ...$kv,cauz map not allow duplicate key
         $command = Enum::MSET;
         $args = [];
         if (!empty($kvMap)) {
