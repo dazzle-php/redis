@@ -80,11 +80,10 @@ trait ApiSetTrait
      * @override
      * @inheritDoc
      */
-    public function sMove($src, $dst, ...$members)
+    public function sMove($src, $dst, $member)
     {
         $command = Enum::SMOVE;
-        $args = [$src, $dst];
-        $args = array_merge($args, $members);
+        $args = [$src, $dst, $member];
 
         return $this->dispatch(Builder::build($command, $args));
     }
