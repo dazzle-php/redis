@@ -4,6 +4,7 @@ namespace Dazzle\Redis;
 
 use Dazzle\Event\EventEmitterInterface;
 use Dazzle\Loop\LoopAwareInterface;
+use Dazzle\Promise\PromiseInterface;
 use Dazzle\Redis\Command\CommandInterface;
 
 /**
@@ -30,21 +31,21 @@ interface RedisInterface extends CommandInterface, EventEmitterInterface, LoopAw
     /**
      * Start Redis client connection immediately.
      *
-     * @return bool
+     * @return PromiseInterface
      */
     public function start();
 
     /**
      * Stop Redis client connection immediately.
      *
-     * @return bool
+     * @return PromiseInterface
      */
     public function stop();
 
     /**
      * Stop Redis client connection when all closing requests has been completed.
      *
-     * @return bool
+     * @return PromiseInterface
      */
     public function end();
 }

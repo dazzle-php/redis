@@ -9,6 +9,7 @@ use Dazzle\Event\BaseEventEmitter;
 use Dazzle\Loop\LoopAwareTrait;
 use Dazzle\Loop\LoopInterface;
 use Dazzle\Promise\Deferred;
+use Dazzle\Promise\Promise;
 use Dazzle\Promise\PromiseInterface;
 use Dazzle\Redis\Driver\Request;
 use Dazzle\Redis\Driver\Driver;
@@ -17,6 +18,7 @@ use Dazzle\Socket\Socket;
 use Dazzle\Socket\SocketInterface;
 use Dazzle\Throwable\Exception\Runtime\ExecutionException;
 use Dazzle\Throwable\Exception\Runtime\UnderflowException;
+use Dazzle\Throwable\Exception\Runtime\WriteException;
 use Error;
 use Exception;
 
@@ -62,6 +64,11 @@ class Redis extends BaseEventEmitter implements RedisInterface
     protected $isBeingDisconnected;
 
     /**
+     * @var PromiseInterface|null;
+     */
+    protected $endPromise;
+
+    /**
      * @var array
      */
     private $reqs;
@@ -79,6 +86,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
 
         $this->isConnected = false;
         $this->isBeingDisconnected = false;
+        $this->endPromise = null;
 
         $this->reqs = [];
     }
@@ -117,7 +125,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
     {
         if ($this->isStarted())
         {
-            return false;
+            return Promise::doResolve($this);
         }
 
         $ex = null;
@@ -134,7 +142,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
 
         if ($ex !== null)
         {
-            return false;
+            return Promise::doReject($ex);
         }
 
         $this->isConnected = true;
@@ -143,7 +151,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $this->handleStart();
         $this->emit('start', [ $this ]);
 
-        return true;
+        return Promise::doResolve($this);
     }
 
     /**
@@ -154,7 +162,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
     {
         if (!$this->isStarted())
         {
-            return false;
+            return Promise::doResolve($this);
         }
 
         $this->isBeingDisconnected = true;
@@ -172,7 +180,14 @@ class Redis extends BaseEventEmitter implements RedisInterface
         $this->handleStop();
         $this->emit('stop', [ $this ]);
 
-        return true;
+        if ($this->endPromise !== null)
+        {
+            $promise = $this->endPromise;
+            $this->endPromise = null;
+            $promise->resolve($this);
+        }
+
+        return Promise::doResolve($this);
     }
 
     /**
@@ -181,14 +196,20 @@ class Redis extends BaseEventEmitter implements RedisInterface
      */
     public function end()
     {
-        if (!$this->isStarted() || $this->isBeingDisconnected)
+        if (!$this->isStarted())
         {
-            return false;
+            return Promise::doResolve($this);
+        }
+        if ($this->isBeingDisconnected)
+        {
+            return Promise::doReject(new WriteException('Tried to double end same connection.'));
         }
 
+        $promise = new Promise();
         $this->isBeingDisconnected = true;
+        $this->endPromise = $promise;
 
-        return true;
+        return $promise;
     }
 
     /**
