@@ -3,7 +3,7 @@
 namespace Dazzle\Redis;
 
 use Dazzle\Event\EventEmitterInterface;
-use Dazzle\Loop\LoopAwareInterface;
+use Dazzle\Loop\LoopResourceInterface;
 use Dazzle\Promise\PromiseInterface;
 use Dazzle\Redis\Command\CommandInterface;
 
@@ -12,7 +12,7 @@ use Dazzle\Redis\Command\CommandInterface;
  * @event stop  : callable(object)
  * @event error : callable(object, Error|Exception)
  */
-interface RedisInterface extends CommandInterface, EventEmitterInterface, LoopAwareInterface
+interface RedisInterface extends CommandInterface, EventEmitterInterface, LoopResourceInterface
 {
     /**
      * Check if Redis client has been started.

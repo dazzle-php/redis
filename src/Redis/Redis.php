@@ -103,6 +103,39 @@ class Redis extends BaseEventEmitter implements RedisInterface
      * @override
      * @inheritDoc
      */
+    public function isPaused()
+    {
+        return $this->stream === null ? false : $this->stream->isPaused();
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function pause()
+    {
+        if ($this->stream !== null)
+        {
+            $this->stream->pause();
+        }
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function resume()
+    {
+        if ($this->stream !== null)
+        {
+            $this->stream->resume();
+        }
+    }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
     public function isStarted()
     {
         return $this->isConnected;
