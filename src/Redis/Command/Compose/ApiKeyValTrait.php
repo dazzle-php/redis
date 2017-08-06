@@ -601,4 +601,16 @@ trait ApiKeyValTrait
 
         return $this->dispatch(Builder::build($command, $args));
     }
+
+    /**
+     * @override
+     * @inheritDoc
+     */
+    public function keys($key = '*')
+    {
+        $command = Enum::KEYS;
+        $args = [$key];
+
+        return $this->dispatch(Builder::build($command, $args));
+    }
 }

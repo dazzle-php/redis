@@ -1083,4 +1083,30 @@ class RedisApiKeyValTest extends TModule
                 });
         });
     }
+
+    /**
+     * @group passed
+     * @dataProvider redisProvider
+     * @param RedisInterface $redis
+     */
+    public function testRedis_IsAbleToExecute_Keys(RedisInterface $redis)
+    {
+        $this->checkRedisVersionedCommand($redis, '1.0.0', function(RedisInterface $redis) {
+            return Promise::doResolve()
+                ->then(function() use($redis) {
+                    return Promise::all([
+                        $redis->set('TEST_A', 'A'),
+                        $redis->set('TEST_B', 'B'),
+                        $redis->set('TEST_C', 'C')
+                    ]);
+                })
+                ->then(function() use($redis) {
+                    return $redis->keys();
+                })
+                ->then(function($value) {
+                    $expected = [ 'TEST_A', 'TEST_B', 'TEST_C' ];
+                    $this->assertEquals(sort($expected), sort($value));
+                });
+        });
+    }
 }

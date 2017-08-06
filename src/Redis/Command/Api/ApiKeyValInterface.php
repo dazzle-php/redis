@@ -408,4 +408,13 @@ interface ApiKeyValInterface
      * @return mixed
      */
     public function sort($key, array $options = []);
+
+    /**
+     * @doc https://redis.io/commands/keys
+     * @since 1.0.0
+     * @param $key
+     * @param array $options
+     * @return mixed
+     */
+    public function keys($key = '*');
 }
