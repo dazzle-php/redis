@@ -238,6 +238,10 @@ class Redis extends BaseEventEmitter implements RedisInterface
         {
             return Promise::doReject(new WriteException('Tried to double end same connection.'));
         }
+        if (!$this->isBusy())
+        {
+            return $this->stop();
+        }
 
         $promise = new Promise();
         $this->isBeingDisconnected = true;
