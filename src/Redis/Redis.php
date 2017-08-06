@@ -97,6 +97,7 @@ class Redis extends BaseEventEmitter implements RedisInterface
     public function __destruct()
     {
         $this->stop();
+        parent::__destruct();
     }
 
     /**
